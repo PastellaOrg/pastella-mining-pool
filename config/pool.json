@@ -1,0 +1,61 @@
+{
+  "pool": {
+    "name": "Pastella Mining Pool",
+    "description": "Professional mining pool for Pastella cryptocurrency using Velora algorithm",
+    "version": "1.0.0",
+    "fee": 0.01,
+    "minPayout": 0.001,
+    "payoutInterval": 3600000,
+    "feeAddress": "1Ggdo3kTzGvmhSDuoZBuFZQeqDSg57FEf6"
+  },
+  "http": {
+    "port": 3000,
+    "host": "0.0.0.0",
+    "cors": true
+  },
+  "stratum": {
+    "port": 3333,
+    "host": "0.0.0.0",
+    "maxConnections": 1000,
+    "timeout": 30000
+  },
+  "daemon": {
+    "url": "http://localhost:22000",
+    "apiKey": "",
+    "username": "",
+    "password": "",
+    "timeout": 30000,
+    "retryInterval": 5000
+  },
+  "mining": {
+    "algorithm": "velora",
+    "startingDifficulty": 100000,
+    "shareTimeout": 300000,
+    "maxShareAge": 3600000,
+    "blockTime": 60
+  },
+  "database": {
+    "type": "sqlite",
+    "path": "./data/pool.db",
+    "backupInterval": 86400000
+  },
+  "logging": {
+    "level": "debug",
+    "file": "./logs/pool.log",
+    "maxSize": "10m",
+    "maxFiles": 5
+  },
+  "security": {
+    "rateLimit": {
+      "windowMs": 900000,
+      "max": 100
+    },
+    "allowedOrigins": ["*"]
+  },
+  "payout": {
+    "enabled": true,
+    "minConfirmations": 6,
+    "batchSize": 50,
+    "gasPrice": "20000000000"
+  }
+}

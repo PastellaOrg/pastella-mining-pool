@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pastella Mining Pool</title>
+    <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Pastella Mining Pool</h1>
+            <p>Professional mining pool for Pastella cryptocurrency using Velora algorithm</p>
+            <div class="status-banner" id="pool-status">Connecting...</div>
+        </div>
+
+        <div class="tabs">
+            <div class="tab active" onclick="showTab('overview', event)">Overview</div>
+            <div class="tab" onclick="showTab('miners', event)">Miners</div>
+            <div class="tab" onclick="showTab('blocks', event)">Found Blocks</div>
+            <div class="tab" onclick="showTab('analytics', event)">Analytics</div>
+            <div class="tab" onclick="showTab('leaderboard', event)">Leaderboard</div>
+            <div class="tab" onclick="showTab('network', event)">Network</div>
+            <div class="tab" onclick="showTab('payments', event)">Payments</div>
+            <div class="tab" onclick="showTab('mining', event)">How to Mine</div>
+            <div class="tab" onclick="showTab('stats', event)">Statistics</div>
+        </div>
+
+        <!-- Overview Tab -->
+        <div id="overview" class="tab-content active">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-value" id="total-hashrate">0 H/s</div>
+                    <div class="stat-label">Total Hashrate</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="active-miners">0</div>
+                    <div class="stat-label">Active Miners</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="current-block">-</div>
+                    <div class="stat-label">Current Block</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="pool-uptime">-</div>
+                    <div class="stat-label">Pool Uptime</div>
+                </div>
+            </div>
+
+            <div class="table-container">
+                <div class="table-header">
+                    <div class="table-title">Recent Activity</div>
+                    <button class="refresh-btn" onclick="refreshData()">Refresh</button>
+                </div>
+                <div id="recent-activity">
+                    <div class="loading">Loading recent activity...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Miners Tab -->
+        <div id="miners" class="tab-content">
+            <div class="table-container">
+                <div class="table-header">
+                    <div class="table-title">Connected Miners</div>
+                    <button class="refresh-btn" onclick="refreshData()">Refresh</button>
+                </div>
+                <div id="miners-table-container">
+                    <div class="loading">Loading miners...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Found Blocks Tab -->
+        <div id="blocks" class="tab-content">
+            <div class="table-container">
+                <div class="table-header">
+                    <div class="table-title">Found Blocks</div>
+                    <button class="refresh-btn" onclick="refreshData()">Refresh</button>
+                </div>
+                <div id="blocks-table-container">
+                    <div class="loading">Loading blocks...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Payments Tab -->
+        <div id="payments" class="tab-content">
+            <div class="table-container">
+                <div class="table-header">
+                    <div class="table-title">Payment History</div>
+                    <button class="refresh-btn" onclick="refreshData()">Refresh</button>
+                </div>
+                <div id="payments-table-container">
+                    <div class="loading">Loading payments...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- How to Mine Tab -->
+        <div id="mining" class="tab-content">
+            <div class="mining-instructions">
+                <h3>How to Mine on Pastella Pool</h3>
+
+                <div class="step">
+                    <h4>1. Download a Compatible Miner</h4>
+                    <p>You can use the official Pastella miner or any miner that supports the Velora algorithm:</p>
+                    <ul style="margin-left: 20px; margin-top: 10px; color: #b8b8b8;">
+                        <li><strong>Pastella Miner:</strong> Official GPU miner optimized for Velora</li>
+                        <li><strong>XMRig:</strong> Multi-algorithm CPU/GPU miner with Velora support</li>
+                        <li><strong>Other miners:</strong> Any miner supporting Velora algorithm</li>
+                    </ul>
+                </div>
+
+                <div class="step">
+                    <h4>2. Configure Your Miner</h4>
+                    <p>Use these connection settings in your miner configuration:</p>
+                    <div style="background: rgba(0, 0, 0, 0.3); padding: 15px; border-radius: 8px; margin: 15px 0; border: 1px solid rgba(236, 155, 231, 0.3);">
+                        <code>Pool URL:</code> <span style="color: #ffffff;">stratum+tcp://localhost:3333</span><br>
+                        <code>Username:</code> <span style="color: #ffffff;">your-wallet-address.worker-name</span><br>
+                        <code>Password:</code> <span style="color: #ffffff;">x</span><br>
+                        <code>Algorithm:</code> <span style="color: #ffffff;">velora</span>
+                    </div>
+                </div>
+
+                <div class="step">
+                    <h4>3. Start Mining</h4>
+                    <p>Run your miner with the configured settings. The pool will automatically:</p>
+                    <ul style="margin-left: 20px; margin-top: 10px; color: #b8b8b8;">
+                        <li>Assign work based on your miner's capabilities</li>
+                        <li>Validate your submitted shares</li>
+                        <li>Credit your account for valid work</li>
+                        <li>Process payouts when you reach the minimum threshold</li>
+                    </ul>
+                </div>
+
+                <div class="step">
+                    <h4>4. Monitor Your Progress</h4>
+                    <p>Use this dashboard to track:</p>
+                    <ul style="margin-left: 20px; margin-top: 10px; color: #b8b8b8;">
+                        <li>Your current hashrate and share submission rate</li>
+                        <li>Total shares submitted and accepted</li>
+                        <li>Estimated earnings and pending payouts</li>
+                        <li>Pool statistics and network difficulty</li>
+                    </ul>
+                </div>
+
+                <div class="step">
+                    <h4>5. Receive Payouts</h4>
+                    <p>Payouts are processed automatically when you reach the minimum threshold of <strong>0.001 PSTL</strong>. The pool fee is <strong>1%</strong>.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Analytics Tab -->
+        <div id="analytics" class="tab-content">
+            <div class="table-container">
+                <div class="table-header">
+                    <div class="table-title">Pool Analytics</div>
+                    <button class="refresh-btn" onclick="refreshData()">Refresh</button>
+                </div>
+                <div id="analytics-container">
+                    <div class="loading">Loading analytics...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Leaderboard Tab -->
+        <div id="leaderboard" class="tab-content">
+            <div class="table-container">
+                <div class="table-header">
+                    <div class="table-title">Miner Leaderboard</div>
+                    <button class="refresh-btn" onclick="refreshData()">Refresh</button>
+                </div>
+                <div id="leaderboard-container">
+                    <div class="loading">Loading leaderboard...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Network Tab -->
+        <div id="network" class="tab-content">
+            <div class="table-container">
+                <div class="table-header">
+                    <div class="table-title">Network Status</div>
+                    <button class="refresh-btn" onclick="refreshData()">Refresh</button>
+                </div>
+                <div id="network-container">
+                    <div class="loading">Loading network data...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Statistics Tab -->
+        <div id="stats" class="tab-content">
+            <div class="table-container">
+                <div class="table-header">
+                    <div class="table-title">Pool Statistics</div>
+                    <button class="refresh-btn" onclick="refreshData()">Refresh</button>
+                </div>
+                <div id="stats-container">
+                    <div class="loading">Loading statistics...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/app.js"></script>
+</body>
+</html>
