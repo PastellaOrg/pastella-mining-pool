@@ -141,6 +141,7 @@ class MiningPool {
             algorithm: this.config.get('mining.algorithm'),
             fee: this.config.get('pool.fee'),
             minPayout: this.config.get('pool.minPayout'),
+            blockExplorer: this.config.get('pool.blockExplorer'),
           },
           mining: {
             blockHeight: template.available ? template.index : 0,
@@ -929,6 +930,7 @@ class MiningPool {
           stats: stats,
           count: payments.length,
           timestamp: new Date().toISOString(),
+          blockExplorer: this.config.get('pool.blockExplorer') || 'http://127.0.0.1:3004'
         });
       } catch (error) {
         logger.error(`Error getting payments: ${error.message}`);
