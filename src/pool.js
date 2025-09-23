@@ -626,7 +626,7 @@ class MiningPool {
           address: address,
           rewards: blockRewards.map(reward => ({
             block_height: reward.block_height,
-            block_hash: reward.block_hash.length > 20 ? reward.block_hash.substring(0, 16) + '...' : reward.block_hash,
+            block_hash: reward.block_hash, // Keep full hash for frontend links
             base_reward: reward.base_reward,
             pool_fee: reward.pool_fee,
             miner_reward: reward.miner_reward,
@@ -639,7 +639,8 @@ class MiningPool {
           confirmed_balance: fromAtomicUnits(await this.database.calculateConfirmedBalance(req.params.address)),
           unconfirmed_balance: fromAtomicUnits(await this.database.calculateUnconfirmedBalance(req.params.address)),
           total_paid: fromAtomicUnits(balanceInfo.total_paid || 0),
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
+          blockExplorer: this.config.get('pool.blockExplorer') || 'http://127.0.0.1:3004'
         });
       } catch (error) {
         logger.error(`Error getting miner rewards for ${req.params.address}: ${error.message}`);
