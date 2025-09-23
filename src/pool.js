@@ -865,6 +865,7 @@ class MiningPool {
             total: blocks.length
           },
           timestamp: new Date().toISOString(),
+          blockExplorer: this.config.get('pool.blockExplorer') || 'http://127.0.0.1:3004'
         });
       } catch (error) {
         logger.error(`Error getting blocks: ${error.message}`);

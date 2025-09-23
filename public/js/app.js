@@ -582,6 +582,8 @@ class MiningPoolDashboard {
             if (!container) return;
 
             if (data.blocks && data.blocks.length > 0) {
+                const blockExplorer = data.blockExplorer || 'http://127.0.0.1:3004';
+
                 const blocksHtml = `
                     <div class="blocks-table-wrapper">
                         <table class="enhanced-blocks-table">
@@ -606,7 +608,7 @@ class MiningPoolDashboard {
                                     <tr class="block-row ${confirmations >= 10 ? 'confirmed' : 'pending'}">
                                         <td class="block-height">${block.height}</td>
                                         <td class="block-hash">
-                                            <span class="hash-text">${block.hash.substring(0, 16)}...</span>
+                                            <a href="${blockExplorer}/block/${block.hash}" target="_blank" style="font-family: 'Courier New', monospace; background: rgba(236, 155, 231, 0.1); padding: 4px 8px; border-radius: 6px; font-size: 0.8rem; color: #ff9ed9; border: 1px solid rgba(236, 155, 231, 0.2); text-decoration: none;" title="${block.hash}">${block.hash.substring(0, 16)}...</a>
                                         </td>
                                         <td class="found-by">
                                             <span class="address-text">${block.found_by}</span>
@@ -1276,9 +1278,9 @@ async function refreshMinerLookupData(address) {
         
         if (rewardsResponse.ok) {
             const rewardsData = await rewardsResponse.json();
-            
+
             // Update per-block rewards table (preserve structure)
-            updatePerBlockRewardsTable(rewardsData.rewards || []);
+            updatePerBlockRewardsTable(rewardsData.rewards || [], rewardsData.blockExplorer);
         }
     } catch (error) {
         console.error('Error refreshing miner lookup data:', error);
@@ -1436,9 +1438,9 @@ async function updatePerBlockRewards(address) {
         const response = await fetch(`/api/miners/address/${encodeURIComponent(address)}/rewards`);
         if (response.ok) {
             const rewardsData = await response.json();
-            
+
             // Update per-block rewards table (now in Rewards tab)
-            updatePerBlockRewardsTable(rewardsData.rewards || []);
+            updatePerBlockRewardsTable(rewardsData.rewards || [], rewardsData.blockExplorer);
         } else {
             // Show empty state
             updatePerBlockRewardsTable([]);
@@ -1452,7 +1454,7 @@ async function updatePerBlockRewards(address) {
 
 
 // Update the per-block rewards table with data (preserve structure)
-function updatePerBlockRewardsTable(rewards) {
+function updatePerBlockRewardsTable(rewards, blockExplorer = 'http://127.0.0.1:3004') {
     const container = document.getElementById('per-block-rewards-container');
     if (!container) return;
 
@@ -1517,8 +1519,13 @@ function updatePerBlockRewardsTable(rewards) {
         
         // Update row values
         row.cells[0].textContent = reward.block_height;
-        row.cells[1].textContent = reward.block_hash;
-        row.cells[1].title = reward.block_hash;
+
+        // Style block hash with link to block explorer (full hash in URL, truncated display)
+        const blockHash = reward.block_hash;
+        const shortHash = blockHash.substring(0, 16) + '...';
+        const hashDisplay = `<a href="${blockExplorer}/block/${blockHash}" target="_blank" style="font-family: 'Courier New', monospace; background: rgba(236, 155, 231, 0.1); padding: 4px 8px; border-radius: 6px; font-size: 0.8rem; color: #ff9ed9; border: 1px solid rgba(236, 155, 231, 0.2); text-decoration: none;">${shortHash}</a>`;
+        row.cells[1].innerHTML = hashDisplay;
+        row.cells[1].title = blockHash;
         row.cells[2].querySelector('.amount').textContent = formatBalance(reward.miner_reward) + ' PAS';
         row.cells[3].textContent = reward.miner_percentage.toFixed(2) + '%';
         
