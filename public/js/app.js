@@ -719,9 +719,15 @@ class MiningPoolDashboard {
                                     txIdDisplay = '-';
                                 }
 
+                                const address = payment.address || payment.minerAddress || '';
+                                const shortAddress = address.substring(0, 16) + '...';
+                                const addressDisplay = address ?
+                                    `<a href="${blockExplorer}/address/${address}" target="_blank" style="font-family: 'Courier New', monospace; background: rgba(236, 155, 231, 0.1); padding: 4px 8px; border-radius: 6px; font-size: 0.8rem; color: #ff9ed9; border: 1px solid rgba(236, 155, 231, 0.2); text-decoration: none;">${shortAddress}</a>` :
+                                    '-';
+
                                 return `
                                     <tr>
-                                        <td style="font-family: monospace; font-size: 0.9rem;">${(payment.address || payment.minerAddress || '').substring(0, 16)}...</td>
+                                        <td>${addressDisplay}</td>
                                         <td>${payment.amount} PAS</td>
                                         <td>${txIdDisplay}</td>
                                         <td>${this.formatTimestamp(payment.timestamp || payment.createdAt)}</td>
