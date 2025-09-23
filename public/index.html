@@ -4,27 +4,37 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pastella Mining Pool</title>
+    <link rel="icon" type="image/png" href="/img/logo.png">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="/css/styles.css">
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>Pastella Mining Pool</h1>
-            <p>Professional mining pool for Pastella cryptocurrency using Velora algorithm</p>
-            <div class="status-banner" id="pool-status">Connecting...</div>
+            <div class="header-logo">
+                <img src="/img/logo.png" alt="Pastella Logo" class="logo-icon">
+                <h1><span class="pas-text">Pas</span><span class="tella-text">tella</span> Pool</h1>
+            </div>
+            <button class="mobile-menu-toggle" onclick="toggleMobileMenu()">
+                <span class="hamburger-line"></span>
+                <span class="hamburger-line"></span>
+                <span class="hamburger-line"></span>
+            </button>
+            <div class="status-banner" id="pool-status" style="display: none;">Connecting...</div>
         </div>
 
-        <div class="tabs">
-            <div class="tab active" onclick="showTab('overview', event)">Overview</div>
-            <div class="tab" onclick="showTab('miners', event)">Miners</div>
-            <div class="tab" onclick="showTab('blocks', event)">Found Blocks</div>
-            <div class="tab" onclick="showTab('analytics', event)">Analytics</div>
-            <div class="tab" onclick="showTab('leaderboard', event)">Leaderboard</div>
-            <div class="tab" onclick="showTab('network', event)">Network</div>
-            <div class="tab" onclick="showTab('payments', event)">Payments</div>
-            <div class="tab" onclick="showTab('mining', event)">How to Mine</div>
-            <div class="tab" onclick="showTab('stats', event)">Statistics</div>
-        </div>
+        <nav class="navigation">
+            <div class="tabs" id="navigation-tabs">
+                <div class="tab active" onclick="showTab('overview', event)">Overview</div>
+                <div class="tab" onclick="showTab('your-stats', event)">Your Stats</div>
+                <div class="tab" onclick="showTab('miners', event)">Miners</div>
+                <div class="tab" onclick="showTab('blocks', event)">Blocks</div>
+                <div class="tab" onclick="showTab('payments', event)">Payments</div>
+                <div class="tab" onclick="showTab('leaderboard', event)">Leaderboard</div>
+                <div class="tab" onclick="showTab('network', event)">Network</div>
+                <div class="tab" onclick="showTab('mining', event)">How to Mine</div>
+            </div>
+        </nav>
 
         <!-- Overview Tab -->
         <div id="overview" class="tab-content active">
@@ -47,13 +57,209 @@
                 </div>
             </div>
 
-            <div class="table-container">
-                <div class="table-header">
-                    <div class="table-title">Recent Activity</div>
-                    <button class="refresh-btn" onclick="refreshData()">Refresh</button>
+            <div class="performance-container">
+                <div class="performance-header">
+                    <div class="performance-title">
+                        <i class="fas fa-chart-line"></i>
+                        Pool Performance
+                    </div>
+                    <button class="refresh-btn" onclick="refreshData()">
+                        <i class="fas fa-sync-alt"></i>
+                        Refresh
+                    </button>
                 </div>
-                <div id="recent-activity">
-                    <div class="loading">Loading recent activity...</div>
+                <div class="performance-grid">
+                    <div class="performance-card">
+                        <div class="performance-icon">
+                            <i class="fas fa-cube"></i>
+                        </div>
+                        <div class="performance-details">
+                            <div class="performance-value" id="blocks-found">0</div>
+                            <div class="performance-label">Blocks Found</div>
+                            <div class="performance-sublabel">Last 24h</div>
+                        </div>
+                    </div>
+                    <div class="performance-card">
+                        <div class="performance-icon">
+                            <i class="fas fa-percentage"></i>
+                        </div>
+                        <div class="performance-details">
+                            <div class="performance-value" id="pool-efficiency">100%</div>
+                            <div class="performance-label">Pool Efficiency</div>
+                            <div class="performance-sublabel">Valid shares ratio</div>
+                        </div>
+                    </div>
+                    <div class="performance-card">
+                        <div class="performance-icon">
+                            <i class="fas fa-network-wired"></i>
+                        </div>
+                        <div class="performance-details">
+                            <div class="performance-value" id="network-difficulty">1.00</div>
+                            <div class="performance-label">Network Difficulty</div>
+                            <div class="performance-sublabel">Current target</div>
+                        </div>
+                    </div>
+                    <div class="performance-card">
+                        <div class="performance-icon">
+                            <i class="fas fa-coins"></i>
+                        </div>
+                        <div class="performance-details">
+                            <div class="performance-value" id="total-paid">0.00 PAS</div>
+                            <div class="performance-label">Total Paid</div>
+                            <div class="performance-sublabel">All time rewards</div>
+                        </div>
+                    </div>
+                    <div class="performance-card">
+                        <div class="performance-icon">
+                            <i class="fas fa-clock"></i>
+                        </div>
+                        <div class="performance-details">
+                            <div class="performance-value" id="avg-block-time">~10m</div>
+                            <div class="performance-label">Avg Block Time</div>
+                            <div class="performance-sublabel">Network average</div>
+                        </div>
+                    </div>
+                    <div class="performance-card">
+                        <div class="performance-icon">
+                            <i class="fas fa-users"></i>
+                        </div>
+                        <div class="performance-details">
+                            <div class="performance-value" id="total-miners">0</div>
+                            <div class="performance-label">Total Miners</div>
+                            <div class="performance-sublabel">All time registered</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Your Stats Tab -->
+        <div id="your-stats" class="tab-content">
+            <div class="lookup-container">
+                <div class="lookup-header">
+                    <h3>Your Mining Statistics</h3>
+                    <p>Enter your wallet address to view your detailed mining performance</p>
+                </div>
+                <div class="lookup-form">
+                    <input type="text" id="address-input" placeholder="Enter wallet address (e.g., 1Ggdo3kTzGvmhSDuoZBuFZQeqDSg57FEf6)" />
+                    <button onclick="lookupMiner()" class="lookup-btn">Lookup</button>
+                </div>
+                <div id="lookup-results" class="lookup-results">
+                    <!-- Enhanced Stats Grid -->
+                    <div class="enhanced-miner-stats-grid">
+                        <div class="enhanced-stat-card">
+                            <div class="stat-icon"><i class="fas fa-bolt"></i></div>
+                            <div class="stat-content">
+                                <div class="stat-value" id="lookup-current-hashrate">0 H/s</div>
+                                <div class="stat-label">Current Hashrate</div>
+                            </div>
+                        </div>
+                        <div class="enhanced-stat-card">
+                            <div class="stat-icon"><i class="fas fa-chart-line"></i></div>
+                            <div class="stat-content">
+                                <div class="stat-value" id="lookup-avg-hashrate">0 H/s</div>
+                                <div class="stat-label">3H Avg Hashrate</div>
+                            </div>
+                        </div>
+                        <div class="enhanced-stat-card">
+                            <div class="stat-icon"><i class="fas fa-cube"></i></div>
+                            <div class="stat-content">
+                                <div class="stat-value" id="lookup-blocks-found">0</div>
+                                <div class="stat-label">Blocks Found</div>
+                            </div>
+                        </div>
+                        <div class="enhanced-stat-card">
+                            <div class="stat-icon"><i class="fas fa-check-circle"></i></div>
+                            <div class="stat-content">
+                                <div class="stat-value" id="lookup-confirmed-balance">0.000000 PAS</div>
+                                <div class="stat-label">Confirmed Balance</div>
+                            </div>
+                        </div>
+                        <div class="enhanced-stat-card">
+                            <div class="stat-icon"><i class="fas fa-clock"></i></div>
+                            <div class="stat-content">
+                                <div class="stat-value" id="lookup-unconfirmed-balance">0.000000 PAS</div>
+                                <div class="stat-label">Unconfirmed Balance</div>
+                            </div>
+                        </div>
+                        <div class="enhanced-stat-card">
+                            <div class="stat-icon"><i class="fas fa-money-bill-wave"></i></div>
+                            <div class="stat-content">
+                                <div class="stat-value" id="lookup-total-paid">0.000000 PAS</div>
+                                <div class="stat-label">Total Paid</div>
+                            </div>
+                        </div>
+                        <div class="enhanced-stat-card">
+                            <div class="stat-icon"><i class="fas fa-users"></i></div>
+                            <div class="stat-content">
+                                <div class="stat-value" id="lookup-workers-online">0</div>
+                                <div class="stat-label">Workers Online</div>
+                            </div>
+                        </div>
+                        <div class="enhanced-stat-card">
+                            <div class="stat-icon"><i class="fas fa-share-alt"></i></div>
+                            <div class="stat-content">
+                                <div class="stat-value" id="lookup-shares">0</div>
+                                <div class="stat-label">Total Shares</div>
+                            </div>
+                        </div>
+                        <div class="enhanced-stat-card">
+                            <div class="stat-icon"><i class="fas fa-trophy"></i></div>
+                            <div class="stat-content">
+                                <div class="stat-value" id="lookup-rewards-per-block">50.00 PAS</div>
+                                <div class="stat-label">Rewards Per Block</div>
+                            </div>
+                        </div>
+                    </div>
+
+
+                    <div class="workers-section">
+                        <div class="section-title">Your Workers</div>
+                        <div class="compact-table">
+                            <div id="lookup-workers-table">
+                                <div class="no-data-message">Enter your wallet address above to view your workers.</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="shares-section">
+                        <div class="section-title">Mining Activity</div>
+                        <div class="mini-tabs">
+                            <div class="mini-tab active" onclick="showMiningTab('shares', event)">Recent Shares</div>
+                            <div class="mini-tab" onclick="showMiningTab('payouts', event)">Payouts</div>
+                            <div class="mini-tab" onclick="showMiningTab('rewards', event)">Rewards</div>
+                        </div>
+
+                        <!-- Recent Shares Tab -->
+                        <div id="mining-shares" class="mining-tab-content active">
+                            <div class="compact-table shares-table">
+                                <div id="lookup-shares-table">
+                                    <div class="no-data-message">Enter your wallet address above to view your recent shares.</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Payouts Tab -->
+                        <div id="mining-payouts" class="mining-tab-content">
+                            <div class="compact-table">
+                                <div id="lookup-payouts-table">
+                                    <div class="no-data-message">No payouts yet. Payouts are processed automatically when you reach the minimum threshold of 0.001 PAS.</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Rewards Tab -->
+                        <div id="mining-rewards" class="mining-tab-content">
+                            <div class="compact-table rewards-table">
+                                <div id="per-block-rewards-container">
+                                    <div class="loading-message">Loading rewards...</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div id="lookup-error" class="error-message" style="display: none;">
+                    No mining data found for this address.
                 </div>
             </div>
         </div>
@@ -62,7 +268,6 @@
         <div id="miners" class="tab-content">
             <div class="table-container">
                 <div class="table-header">
-                    <div class="table-title">Connected Miners</div>
                     <button class="refresh-btn" onclick="refreshData()">Refresh</button>
                 </div>
                 <div id="miners-table-container">
@@ -71,11 +276,11 @@
             </div>
         </div>
 
-        <!-- Found Blocks Tab -->
+        <!-- Blocks Tab -->
         <div id="blocks" class="tab-content">
             <div class="table-container">
                 <div class="table-header">
-                    <div class="table-title">Found Blocks</div>
+                    <div class="table-title">Blocks</div>
                     <button class="refresh-btn" onclick="refreshData()">Refresh</button>
                 </div>
                 <div id="blocks-table-container">
@@ -99,71 +304,49 @@
 
         <!-- How to Mine Tab -->
         <div id="mining" class="tab-content">
-            <div class="mining-instructions">
-                <h3>How to Mine on Pastella Pool</h3>
-
-                <div class="step">
-                    <h4>1. Download a Compatible Miner</h4>
-                    <p>You can use the official Pastella miner or any miner that supports the Velora algorithm:</p>
-                    <ul style="margin-left: 20px; margin-top: 10px; color: #b8b8b8;">
-                        <li><strong>Pastella Miner:</strong> Official GPU miner optimized for Velora</li>
-                        <li><strong>XMRig:</strong> Multi-algorithm CPU/GPU miner with Velora support</li>
-                        <li><strong>Other miners:</strong> Any miner supporting Velora algorithm</li>
-                    </ul>
-                </div>
-
-                <div class="step">
-                    <h4>2. Configure Your Miner</h4>
-                    <p>Use these connection settings in your miner configuration:</p>
-                    <div style="background: rgba(0, 0, 0, 0.3); padding: 15px; border-radius: 8px; margin: 15px 0; border: 1px solid rgba(236, 155, 231, 0.3);">
-                        <code>Pool URL:</code> <span style="color: #ffffff;">stratum+tcp://localhost:3333</span><br>
-                        <code>Username:</code> <span style="color: #ffffff;">your-wallet-address.worker-name</span><br>
-                        <code>Password:</code> <span style="color: #ffffff;">x</span><br>
-                        <code>Algorithm:</code> <span style="color: #ffffff;">velora</span>
+            <div class="mining-instructions-compact">
+                <div class="mining-header">
+                    <h3>How to Mine</h3>
+                    <div class="download-section-header">
+                        <a href="https://github.com/PastellaOrg/pastella-miner/releases/latest" target="_blank" class="download-btn">
+                            <i class="fas fa-download"></i>
+                            Download Pastella Miner
+                        </a>
+                        <span class="download-info">Latest release from GitHub</span>
                     </div>
                 </div>
 
-                <div class="step">
-                    <h4>3. Start Mining</h4>
-                    <p>Run your miner with the configured settings. The pool will automatically:</p>
-                    <ul style="margin-left: 20px; margin-top: 10px; color: #b8b8b8;">
-                        <li>Assign work based on your miner's capabilities</li>
-                        <li>Validate your submitted shares</li>
-                        <li>Credit your account for valid work</li>
-                        <li>Process payouts when you reach the minimum threshold</li>
-                    </ul>
+                <div class="step-compact">
+                    <div class="step-header">
+                        <div class="step-number">1</div>
+                        <h4>Get a Miner</h4>
+                    </div>
+                    <p>Use the official <strong>Pastella Miner</strong> for best performance with Velora algorithm.</p>
                 </div>
 
-                <div class="step">
-                    <h4>4. Monitor Your Progress</h4>
-                    <p>Use this dashboard to track:</p>
-                    <ul style="margin-left: 20px; margin-top: 10px; color: #b8b8b8;">
-                        <li>Your current hashrate and share submission rate</li>
-                        <li>Total shares submitted and accepted</li>
-                        <li>Estimated earnings and pending payouts</li>
-                        <li>Pool statistics and network difficulty</li>
-                    </ul>
+                <div class="step-compact">
+                    <div class="step-header">
+                        <div class="step-number">2</div>
+                        <h4>Connection Settings</h4>
+                    </div>
+                    <div class="config-box">
+                        <div class="config-line"><code>Pool:</code> stratum+tcp://localhost</div>
+                        <div class="config-line"><code>Port:</code> 3333</div>
+                        <div class="config-line"><code>Wallet:</code> wallet-address</div>
+                        <div class="config-line"><code>Worker:</code> Worker-name</div>
+                    </div>
                 </div>
 
-                <div class="step">
-                    <h4>5. Receive Payouts</h4>
-                    <p>Payouts are processed automatically when you reach the minimum threshold of <strong>0.001 PSTL</strong>. The pool fee is <strong>1%</strong>.</p>
+                <div class="step-compact">
+                    <div class="step-header">
+                        <div class="step-number">3</div>
+                        <h4>Start & Monitor</h4>
+                    </div>
+                    <p>Start mining and track progress on <em>Your Stats</em> tab. Payouts processed at <strong>0.001 PSTL</strong> minimum with <strong>1% pool fee</strong>.</p>
                 </div>
             </div>
         </div>
 
-        <!-- Analytics Tab -->
-        <div id="analytics" class="tab-content">
-            <div class="table-container">
-                <div class="table-header">
-                    <div class="table-title">Pool Analytics</div>
-                    <button class="refresh-btn" onclick="refreshData()">Refresh</button>
-                </div>
-                <div id="analytics-container">
-                    <div class="loading">Loading analytics...</div>
-                </div>
-            </div>
-        </div>
 
         <!-- Leaderboard Tab -->
         <div id="leaderboard" class="tab-content">
@@ -191,18 +374,6 @@
             </div>
         </div>
 
-        <!-- Statistics Tab -->
-        <div id="stats" class="tab-content">
-            <div class="table-container">
-                <div class="table-header">
-                    <div class="table-title">Pool Statistics</div>
-                    <button class="refresh-btn" onclick="refreshData()">Refresh</button>
-                </div>
-                <div id="stats-container">
-                    <div class="loading">Loading statistics...</div>
-                </div>
-            </div>
-        </div>
     </div>
 
     <script src="/js/app.js"></script>

@@ -26,8 +26,6 @@ class SubmitHandlers {
       return;
     }
 
-    logger.debug(`Submit params type: ${typeof params}, value: ${JSON.stringify(params)}`);
-
     let workerName, jobId, extraNonce2, nTime, nonce, result;
     if (Array.isArray(params)) {
       [workerName, jobId, extraNonce2, nTime, nonce] = params;
@@ -44,10 +42,7 @@ class SubmitHandlers {
       return;
     }
 
-    logger.debug(`Extracted params - worker: ${workerName}, jobId: ${jobId}, extraNonce2: ${extraNonce2}, nTime: ${nTime}, nonce: ${nonce}, result: ${result}`);
-
     if (!workerName || !jobId || !extraNonce2 || !nTime || !nonce) {
-      logger.debug(`Missing required parameters - worker: ${!!workerName}, jobId: ${!!jobId}, extraNonce2: ${!!extraNonce2}, nTime: ${!!nTime}, nonce: ${!!nonce}`);
       this.server.sendError(clientId, id, -1, 'Missing parameters');
       return;
     }
@@ -72,8 +67,6 @@ class SubmitHandlers {
       workerName: workerName,
     };
 
-    logger.debug(`Share data timestamp: ${shareData.timestamp} (from nTime: ${nTime})`);
-
     try {
       const template = this.server.blockTemplateManager.getCurrentTemplate();
       if (!template) {
@@ -83,11 +76,9 @@ class SubmitHandlers {
 
       const hash = result;
       shareData.hash = hash;
-      shareData.difficulty = client.difficulty || 1;
-
-      logger.debug(`XMRig submitted hash: ${hash}`);
-      logger.debug(`Share nonce: ${nonce}, timestamp: ${shareData.timestamp}`);
-      logger.debug(`Job template timestamp: ${template.timestamp}`);
+      shareData.difficulty = this.server.difficultyManager ?
+        this.server.difficultyManager.getClientDifficulty(clientId) :
+        (client.difficulty || this.server.config.get('mining.startingDifficulty') || 50000);
 
       if (!this.server.shareValidator) {
         logger.error('Share validator not available');
@@ -103,13 +94,20 @@ class SubmitHandlers {
 
       if (validation.valid) {
         this.server.stats.validShares++;
-        this.server.hashrateService.recordShareForHashrate(clientId, client.difficulty || 1);
+        const actualDifficulty = this.server.difficultyManager ?
+          this.server.difficultyManager.getClientDifficulty(clientId) :
+          (client.difficulty || this.server.config.get('mining.startingDifficulty') || 50000);
+        this.server.hashrateService.recordShareForHashrate(clientId, actualDifficulty);
 
         if (this.server.difficultyManager) {
           const adjustment = this.server.difficultyManager.checkDifficultyAdjustment(clientId);
+          logger.debug(`Difficulty check for ${clientId}: ${adjustment ? 'got adjustment' : 'no adjustment'}`);
           if (adjustment && adjustment.adjusted) {
             client.difficulty = adjustment.newDifficulty;
-            logger.info(`⚡ ${client.address || client.workerName} difficulty adjusted: ${adjustment.oldDifficulty} → ${adjustment.newDifficulty}`);
+            // Send new difficulty to miner
+            logger.debug(`About to send difficulty ${adjustment.newDifficulty} to ${clientId}`);
+            this.server.sendDifficulty(clientId, adjustment.newDifficulty);
+            logger.info(`Difficulty adjusted for ${client.address || client.workerName}: ${adjustment.oldDifficulty} -> ${adjustment.newDifficulty}`);
           }
         }
 
@@ -117,14 +115,22 @@ class SubmitHandlers {
           const template = this.server.blockTemplateManager.getCurrentTemplate();
           const blockHeight = template ? template.index : null;
           if (blockHeight !== null && this.server.processingHeights.has(blockHeight)) {
-            logger.warn(`⚠️ Block solution for height ${blockHeight} already being processed, skipping duplicate submission`);
             this.server.stats.blocksFound++;
             return;
           }
 
           this.server.stats.blocksFound++;
-          logger.info(`🎉 BLOCK FOUND by ${client.address || client.workerName} at height ${blockHeight}`);
-          logger.debug(`Block hash: ${hash}, nonce: ${nonce}, timestamp: ${shareData.timestamp}`);
+          logger.info(`Block found by ${client.address || client.workerName} at height ${blockHeight}`);
+
+          // Distribute block rewards to all contributors
+          if (this.server.databaseManager) {
+            try {
+              await this.distributeBlockReward(blockHeight, shareData.hash);
+              logger.info(`Distributed block rewards for block ${blockHeight}`);
+            } catch (error) {
+              logger.error(`Failed to distribute block rewards: ${error.message}`);
+            }
+          }
 
           this.server.sendToClient(clientId, { id, result: { status: 'WAIT' }, error: null });
 
@@ -137,19 +143,127 @@ class SubmitHandlers {
         }
 
         this.server.sendToClient(clientId, { id, result: { status: 'OK' }, error: null });
-        logger.info(`✅ Share accepted from ${client.address || client.workerName} (diff: ${client.difficulty || 1})`);
+        logger.info(`Share accepted from ${client.address || client.workerName} (IP: ${client.socket.remoteAddress}, Job: ${jobId})`);
       } else {
         this.server.stats.invalidShares++;
         this.server.sendError(clientId, id, -1, `Invalid share: ${validation.reason}`);
-        logger.info(`❌ Share rejected from ${client.address || client.workerName} (diff: ${client.difficulty || 1}): ${validation.reason}`);
+        logger.info(`Share rejected from ${client.address || client.workerName}: ${validation.reason}`);
       }
     } catch (error) {
-      logger.error(`❌ Share processing error from ${client.address || client.workerName}: ${error.message}`);
-      logger.debug(`Error stack: ${error.stack}`);
+      logger.error(`Share processing error from ${client.address || client.workerName}: ${error.message}`);
       this.server.sendError(clientId, id, -1, 'Share processing error');
     }
 
     this.server.stats.totalShares++;
+  }
+
+  async distributeBlockReward(blockHeight, blockHash) {
+    const blockReward = 50.0; // PAS per block
+    const poolFeePercent = 1.0; // 1% pool fee
+    const timeWindow = 600000; // 10 minutes - shares that contributed to this block
+    
+    // Get all miners who contributed shares in the time window leading to this block
+    const totalShares = await this.server.databaseManager.getTotalPoolShares(timeWindow);
+    if (totalShares === 0) {
+      logger.warn(`No shares found for block reward distribution (block ${blockHeight})`);
+      return;
+    }
+
+    // Calculate net reward after pool fee
+    const poolFee = blockReward * (poolFeePercent / 100);
+    const netReward = blockReward - poolFee;
+    
+    // Block hash is now passed as parameter from the share submission context
+    
+    // Get all unique miners from recent shares
+    const miners = await this.server.databaseManager.getMinersWithShares(timeWindow);
+    
+    // Calculate total pool hashrate (estimated from recent hashrate data)
+    let totalPoolHashrate = 0;
+    try {
+      // Get current miners' hashrates
+      const currentMiners = await this.server.databaseManager.getAllMiners();
+      totalPoolHashrate = currentMiners.reduce((sum, miner) => sum + (miner.hashrate || 0), 0);
+    } catch (error) {
+      logger.warn(`Could not calculate total pool hashrate: ${error.message}`);
+    }
+    
+    for (const minerData of miners) {
+      const minerShares = minerData.share_count;
+      const minerAddress = minerData.miner_id;
+      
+      // Calculate this miner's share of the reward (PPLNS)
+      // Fix: Cap minerContribution at 1.0 to prevent over 100% when single miner has many shares
+      const minerContribution = Math.min(minerShares / totalShares, 1.0);
+      const minerReward = netReward * minerContribution;
+      const minerPercentage = minerContribution * 100; // Convert to percentage
+      
+      // Get miner's current hashrate for the record
+      let minerHashrate = 0;
+      try {
+        const minerRecord = await this.server.databaseManager.get(
+          'SELECT hashrate FROM miners WHERE address = ? ORDER BY last_seen DESC LIMIT 1',
+          [minerAddress]
+        );
+        minerHashrate = minerRecord ? minerRecord.hashrate : 0;
+      } catch (error) {
+        logger.debug(`Could not get miner hashrate for ${minerAddress}: ${error.message}`);
+      }
+      
+      if (minerReward > 0) {
+        // Add to unconfirmed balance - use our fixed reward calculation instead of recalculating
+        const existingRecord = await this.server.databaseManager.get(
+          'SELECT address FROM leaderboard WHERE address = ?', 
+          [minerAddress]
+        );
+
+        const { toAtomicUnits } = require('../../utils/atomicUnits.js');
+        const minerRewardAtomic = toAtomicUnits(minerReward);
+
+        if (!existingRecord) {
+          await this.server.databaseManager.addMinerToLeaderboard(minerAddress, {
+            worker_count: 1,
+            total_hashrate: 0,
+            confirmed_balance: 0,
+            unconfirmed_balance: minerRewardAtomic,
+            total_paid: 0,
+            total_shares: minerShares,
+            valid_shares: minerShares,
+            rejected_shares: 0,
+            blocks_found: 0
+          });
+        } else {
+          await this.server.databaseManager.run(
+            `UPDATE leaderboard SET unconfirmed_balance = unconfirmed_balance + ? WHERE address = ?`,
+            [minerRewardAtomic, minerAddress]
+          );
+        }
+        
+        // Store per-block reward data (new functionality)
+        try {
+          await this.server.databaseManager.addBlockReward({
+            block_height: blockHeight,
+            block_hash: blockHash,
+            miner_address: minerAddress,
+            base_reward: blockReward,
+            pool_fee: poolFee,
+            miner_reward: minerReward,
+            pool_hashrate: totalPoolHashrate,
+            miner_hashrate: minerHashrate,
+            miner_percentage: minerPercentage,
+            timestamp: Date.now()
+          });
+          
+          logger.debug(`Block reward stored: ${minerAddress} received ${minerReward.toFixed(6)} PAS (${minerPercentage.toFixed(2)}%) for block ${blockHeight}`);
+        } catch (error) {
+          logger.error(`Failed to store block reward for ${minerAddress}: ${error.message}`);
+        }
+        
+        logger.debug(`Block reward distributed: ${minerAddress} received ${minerReward.toFixed(6)} PAS for ${minerShares}/${totalShares} shares`);
+      }
+    }
+    
+    logger.info(`Block ${blockHeight}: Distributed ${netReward} PAS among ${miners.length} miners (${poolFee} PAS pool fee)`);
   }
 }
 

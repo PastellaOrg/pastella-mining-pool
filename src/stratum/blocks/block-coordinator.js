@@ -10,7 +10,7 @@ class BlockCoordinator {
     const blockHeight = template ? template.index : null;
 
     if (blockHeight !== null && this.server.processingHeights.has(blockHeight)) {
-      logger.warn(`⚠️ Block submission for height ${blockHeight} already in progress, skipping duplicate submission`);
+      logger.warn(`Block submission for height ${blockHeight} already in progress, skipping duplicate submission`);
       return;
     }
 
@@ -23,8 +23,14 @@ class BlockCoordinator {
       logger.debug('Handling block submission - waiting for daemon response...');
       const submissionResult = await blockSubmissionPromise;
 
+      // Handle duplicate block case
+      if (submissionResult && submissionResult.duplicate) {
+        logger.debug(`Block height ${blockHeight} already processed, skipping`);
+        return;
+      }
+
       if (submissionResult && submissionResult.success && submissionResult.invalidateJobs) {
-        logger.info(`🚫 Block VALIDATED by daemon! Invalidating all jobs for height ${submissionResult.blockIndex}`);
+        logger.info(`Block validated by daemon - invalidating jobs for height ${submissionResult.blockIndex}`);
 
         if (this.server.databaseManager && submissionResult.blockData) {
           try {
@@ -32,7 +38,7 @@ class BlockCoordinator {
             const hash = submissionResult.hash || submissionResult.blockData.hash || 'unknown';
             logger.debug(`Block stored in database: height ${submissionResult.blockIndex}, hash ${hash.substring(0, 16)}...`);
           } catch (dbError) {
-            logger.error(`❌ Failed to store block in database: ${dbError.message}`);
+            logger.error(`Failed to store block in database: ${dbError.message}`);
           }
         }
 
@@ -42,14 +48,14 @@ class BlockCoordinator {
         return;
       } else if (submissionResult && !submissionResult.success) {
         // Block was rejected by daemon - handle gracefully
-        logger.warn(`❌ Block submission failed: ${submissionResult.error}`);
+        logger.warn(`Block submission failed: ${submissionResult.error}`);
         
         if (submissionResult.statusCode === 400) {
-          logger.warn(`⚠️ Invalid block solution - hash likely doesn't meet network difficulty`);
+          logger.warn(`Invalid block solution - hash likely doesn't meet network difficulty`);
         }
         
         // CRITICAL FIX: Send fresh jobs to miners immediately after failed block
-        logger.info(`🚀 Sending fresh jobs to miners after failed block submission...`);
+        logger.info(`Sending fresh jobs to miners after failed block submission`);
         
         // Force template update to get latest block template
         await this.server.blockTemplateManager.forceUpdate();
@@ -58,9 +64,12 @@ class BlockCoordinator {
         if (newTemplate) {
           // Generate new job with fresh template
           const jobId = this.server.generateJobId();
+          // 🎯 CRITICAL FIX: Deep copy template to preserve original timestamp and parameters
+          const originalTemplate = JSON.parse(JSON.stringify(newTemplate));
           const job = {
             id: jobId,
             template: newTemplate,
+            originalTemplate: originalTemplate, // 🎯 NEW: Preserve original template for exact mining conditions
             transactions: newTemplate.transactions || [],
             previousHash: newTemplate.previousHash || 'unknown',
             merkleRoot: newTemplate.merkleRoot || 'unknown',
@@ -69,6 +78,7 @@ class BlockCoordinator {
             ntime: Math.floor((newTemplate.timestamp || Date.now()) / 1000),
             cleanJobs: true, // Tell miners to abandon current work
             expiresAt: newTemplate.expiresAt || Date.now() + 300000,
+            createdAt: Date.now(), // 🎯 Track when job was created for debugging
           };
           
           this.server.jobs.set(jobId, job);
@@ -76,7 +86,7 @@ class BlockCoordinator {
           
           // Broadcast new job to all connected miners
           const broadcastResult = this.server.broadcastNewJob(job);
-          logger.info(`📡 Fresh job sent to miners after failed block (height: ${newTemplate.index}, diff: ${newTemplate.difficulty})`);
+          logger.info(`Fresh job sent to miners after failed block (height: ${newTemplate.index}, diff: ${newTemplate.difficulty})`);
         }
         
         logger.info(`Continuing normal operation after failed block submission...`);
@@ -99,9 +109,12 @@ class BlockCoordinator {
       if (newHeight > oldHeight) {
         logger.debug(`New block template detected! Height: ${oldHeight} -> ${newHeight}`);
         const jobId = this.server.generateJobId();
+        // 🎯 CRITICAL FIX: Deep copy template to preserve original timestamp and parameters
+        const originalTemplate = JSON.parse(JSON.stringify(newTemplate));
         const job = {
           id: jobId,
           template: newTemplate,
+          originalTemplate: originalTemplate, // 🎯 NEW: Preserve original template for exact mining conditions
           transactions: newTemplate.transactions || [],
           previousHash: newTemplate.previousHash || 'unknown',
           merkleRoot: newTemplate.merkleRoot || 'unknown',
@@ -110,6 +123,7 @@ class BlockCoordinator {
           ntime: Math.floor((newTemplate.timestamp || Date.now()) / 1000),
           cleanJobs: true,
           expiresAt: newTemplate.expiresAt || Date.now() + 300000,
+          createdAt: Date.now(), // 🎯 Track when job was created for debugging
         };
 
         this.server.jobs.set(jobId, job);
@@ -117,7 +131,7 @@ class BlockCoordinator {
         this.server.broadcastNewJob(job);
         logger.debug(`New job broadcasted after block submission: ${job.id}`);
       } else {
-        logger.warn(`⚠️ Template unchanged after block submission (height: ${newHeight})`);
+        logger.warn(`Template unchanged after block submission (height: ${newHeight})`);
         logger.warn('This might indicate the daemon has not yet processed the submitted block');
 
         logger.info('Waiting additional 2 seconds and trying again...');
@@ -128,11 +142,14 @@ class BlockCoordinator {
         const retryHeight = retryTemplate ? retryTemplate.index : 0;
 
         if (retryHeight > oldHeight) {
-          logger.info(`✅ New template found on retry! Height: ${oldHeight} -> ${retryHeight}`);
+          logger.info(`New template found on retry - height: ${oldHeight} -> ${retryHeight}`);
           const retryJobId = this.server.generateJobId();
+          // 🎯 CRITICAL FIX: Deep copy template to preserve original timestamp and parameters
+          const originalTemplate = JSON.parse(JSON.stringify(retryTemplate));
           const retryJob = {
             id: retryJobId,
             template: retryTemplate,
+            originalTemplate: originalTemplate, // 🎯 NEW: Preserve original template for exact mining conditions
             transactions: retryTemplate.transactions || [],
             previousHash: retryTemplate.previousHash || 'unknown',
             merkleRoot: retryTemplate.merkleRoot || 'unknown',
@@ -141,23 +158,27 @@ class BlockCoordinator {
             ntime: Math.floor((retryTemplate.timestamp || Date.now()) / 1000),
             cleanJobs: true,
             expiresAt: retryTemplate.expiresAt || Date.now() + 300000,
+            createdAt: Date.now(), // 🎯 Track when job was created for debugging
           };
 
           this.server.jobs.set(retryJobId, retryJob);
           this.server.jobManager.cleanupOldJobs();
           this.server.broadcastNewJob(retryJob);
-          logger.info(`🚀 New job broadcasted after retry: ${retryJob.id}`);
+          logger.info(`New job broadcasted after retry: ${retryJob.id}`);
         } else {
-          logger.warn(`⚠️ Template still unchanged after retry - this is normal if block was rejected by daemon`);
+          logger.warn(`Template still unchanged after retry - this is normal if block was rejected by daemon`);
           
           // CRITICAL FIX: Even if template unchanged, generate fresh job with new ID
           // This ensures miners get a new job and don't get stuck on the old one
-          logger.info(`🚀 Sending fresh job to miners even with unchanged template...`);
+          logger.info(`Sending fresh job to miners even with unchanged template`);
           
           const freshJobId = this.server.generateJobId();
+          // 🎯 CRITICAL FIX: Deep copy template to preserve original timestamp and parameters
+          const originalTemplate = JSON.parse(JSON.stringify(retryTemplate));
           const freshJob = {
             id: freshJobId,
             template: retryTemplate,
+            originalTemplate: originalTemplate, // 🎯 NEW: Preserve original template for exact mining conditions
             transactions: retryTemplate.transactions || [],
             previousHash: retryTemplate.previousHash || 'unknown',
             merkleRoot: retryTemplate.merkleRoot || 'unknown',
@@ -166,12 +187,13 @@ class BlockCoordinator {
             ntime: Math.floor((retryTemplate.timestamp || Date.now()) / 1000),
             cleanJobs: true, // Force miners to start fresh work
             expiresAt: retryTemplate.expiresAt || Date.now() + 300000,
+            createdAt: Date.now(), // 🎯 Track when job was created for debugging
           };
           
           this.server.jobs.set(freshJobId, freshJob);
           this.server.jobManager.cleanupOldJobs();
           this.server.broadcastNewJob(freshJob);
-          logger.info(`📡 Fresh job sent to miners with unchanged template (job: ${freshJobId}, height: ${retryTemplate.index})`);
+          logger.info(`Fresh job sent to miners with unchanged template (job: ${freshJobId}, height: ${retryTemplate.index})`);
           logger.info(`Continuing normal mining operation...`);
         }
       }

@@ -138,7 +138,7 @@ class StratumServer {
         subscribed: false,
         authorized: false,
         workerName: null,
-        difficulty: this.difficultyManager ? this.difficultyManager.registerClient(clientId) : 1,
+        difficulty: this.difficultyManager ? this.difficultyManager.registerClient(clientId, this.getNetworkDifficulty()) : 1,
         lastActivity: Date.now(),
         buffer: '', // Buffer for incomplete JSON messages
       };
@@ -147,32 +147,17 @@ class StratumServer {
       this.stats.totalConnections++;
       this.stats.activeConnections++;
 
-      logger.info(`🔗 Miner connected: ${clientInfo.address}`);
-
-      // Send welcome message
-      this.sendToClient(clientId, {
-        id: null,
-        result: {
-          version: '1.0.0',
-          protocol: 'stratum',
-          server: 'Pastella Mining Pool',
-        },
-        error: null,
-      });
+      logger.info(`Miner connected: ${clientInfo.address}`);
 
       // Handle client messages
       socket.on('data', async data => {
         try {
           const rawData = data.toString();
-          logger.debug(`Raw data from ${clientId}: ${rawData}`);
-          logger.debug(`Data length: ${rawData.length} bytes, Data type: ${typeof rawData}`);
-          logger.debug(`Raw data hex: ${Buffer.from(rawData).toString('hex')}`);
           clientInfo.buffer += rawData;
           await this.processBuffer(clientId);
           clientInfo.lastActivity = Date.now();
         } catch (error) {
           logger.error(`Error handling message from ${clientId}: ${error.message}`);
-          logger.debug(`Error stack: ${error.stack}`);
           this.sendError(clientId, null, -1, 'Invalid JSON');
         }
       });
@@ -183,9 +168,6 @@ class StratumServer {
       });
 
       socket.on('error', error => {
-        const client = this.clients.get(clientId);
-        const minerAddress = client ? (client.address || client.workerName || 'Unknown Miner') : 'Unknown Miner';
-        logger.debug(`Miner disconnected: ${minerAddress} (client: ${clientId}): ${error.message}`);
         this.handleDisconnect(clientId);
       });
     } catch (error) {
@@ -216,11 +198,8 @@ class StratumServer {
         if (line.trim()) {
           try {
             const message = JSON.parse(line.trim());
-            logger.debug(`Received message from ${clientId}: ${JSON.stringify(message)}`);
             await this.handleMessage(clientId, message);
           } catch (error) {
-            logger.debug(`JSON parse error from ${clientId}: ${error.message}, line: ${line}`);
-            logger.debug(`Error stack: ${error.stack}`);
             this.sendError(clientId, null, -1, 'Invalid JSON');
           }
         }
@@ -239,14 +218,12 @@ class StratumServer {
       const client = this.clients.get(clientId);
       if (client) {
         const minerAddress = client.address || client.workerName || 'Unknown Miner';
-        logger.info(`🔌 ${minerAddress} disconnected`);
+        logger.info(`Miner disconnected: ${minerAddress}`);
         this.clients.delete(clientId);
         if (this.difficultyManager) {
           this.difficultyManager.unregisterClient(clientId);
         }
         this.stats.activeConnections--;
-      } else {
-        logger.debug(`Unknown client disconnected: ${clientId}`);
       }
     } catch (error) {
       logger.error(`Error in handleDisconnect for client ${clientId}: ${error.message}`);
@@ -260,10 +237,6 @@ class StratumServer {
   async handleMessage(clientId, message) {
     try {
       const { method, params, id } = message;
-
-      logger.debug(
-        `Processing message from ${clientId}: method=${method}, id=${id}, params=${JSON.stringify(params)}, paramsType=${typeof params}`
-      );
 
       // Validate message structure
       if (!method) {
@@ -294,7 +267,6 @@ class StratumServer {
           await this.handleSuggestDifficulty(clientId, params, id);
           break;
         default:
-          logger.warn(`Unknown method from client ${clientId}: ${method}`);
           this.sendError(clientId, id, -1, 'Method not found');
       }
     } catch (error) {
@@ -330,7 +302,6 @@ class StratumServer {
       error: null,
     });
 
-    logger.info(`Client ${clientId} subscribed successfully`);
   }
 
   /**
@@ -370,26 +341,34 @@ class StratumServer {
 
     // For now, accept any worker (in production, validate against database)
     client.authorized = true;
-    client.workerName = workerName;
-    // Store the wallet address (workerName is typically the wallet address in crypto mining)
-    client.address = workerName;
+    // Parse worker name - format is typically wallet_address.worker_name
+    let walletAddress = workerName;
+    let actualWorkerName = workerName;
+    
+    if (workerName.includes('.')) {
+      [walletAddress, actualWorkerName] = workerName.split('.', 2);
+    } else {
+      // If no worker name specified, use a default
+      actualWorkerName = 'worker1';
+    }
+    
+    client.workerName = actualWorkerName;
+    client.address = walletAddress;
 
     // Add miner to database
     if (this.databaseManager) {
       try {
         await this.databaseManager.addMiner({
           id: clientId,
-          address: workerName, // Use workerName as the wallet address
-          worker_name: workerName,
+          address: walletAddress,
+          worker_name: actualWorkerName,
           hashrate: 0,
           shares: 0,
           last_seen: Date.now(),
           created_at: Date.now()
         });
-        logger.info(`Miner ${workerName} added to database with ID ${clientId}`);
       } catch (error) {
         logger.error(`Failed to add miner to database: ${error.message}`);
-        logger.error(`Error stack: ${error.stack}`);
       }
     }
 
@@ -398,8 +377,6 @@ class StratumServer {
       result: true,
       error: null,
     });
-
-    logger.info(`Miner '${workerName}' authorized successfully (client: ${clientId})`);
   }
 
   /**
@@ -439,26 +416,34 @@ class StratumServer {
 
     // For now, accept any worker (in production, validate against database)
     client.authorized = true;
-    client.workerName = workerName;
-    // Store the wallet address (workerName is typically the wallet address in crypto mining)
-    client.address = workerName;
+    // Parse worker name - format is typically wallet_address.worker_name
+    let walletAddress = workerName;
+    let actualWorkerName = workerName;
+    
+    if (workerName.includes('.')) {
+      [walletAddress, actualWorkerName] = workerName.split('.', 2);
+    } else {
+      // If no worker name specified, use a default
+      actualWorkerName = 'worker1';
+    }
+    
+    client.workerName = actualWorkerName;
+    client.address = walletAddress;
 
     // Add miner to database
     if (this.databaseManager) {
       try {
         await this.databaseManager.addMiner({
           id: clientId,
-          address: workerName, // Use workerName as the wallet address
-          worker_name: workerName,
+          address: walletAddress,
+          worker_name: actualWorkerName,
           hashrate: 0,
           shares: 0,
           last_seen: Date.now(),
           created_at: Date.now()
         });
-        logger.info(`Miner ${workerName} added to database with ID ${clientId}`);
       } catch (error) {
         logger.error(`Failed to add miner to database: ${error.message}`);
-        logger.error(`Error stack: ${error.stack}`);
       }
     }
 
@@ -468,45 +453,19 @@ class StratumServer {
 
     // Send login response with job - xmrig expects this format
     let currentJob = this.getCurrentJob();
-    logger.debug(`Login: getCurrentJob() returned: ${currentJob ? currentJob.id : 'NULL'}`);
 
     // If no job available, try to create one now (synchronously)
     if (!currentJob) {
-      logger.info(`Login: No current job available, attempting to create one now`);
       try {
-        const template = this.blockTemplateManager.getCurrentTemplate();
-        if (template) {
-          logger.debug(`Login: Template structure: ${JSON.stringify(template, null, 2)}`);
-          // Create job immediately
-          const jobId = `job_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-          const job = {
-            id: jobId,
-            template: template,
-            createdAt: Date.now(),
-            expiresAt: Date.now() + 300000, // 5 minutes
-            previousHash: template.previousblockhash || template.previousHash,
-            nbits: (template.bits || template.difficulty || 0x1d00ffff).toString(16),
-            ntime: Math.floor(template.curtime || template.timestamp || Date.now() / 1000),
-            version: 1,
-          };
-
-          this.jobs.set(jobId, job);
-          this.currentJobId = jobId;
-          currentJob = job;
-
-          logger.info(`Login: Successfully created job ${currentJob.id} for client ${clientId}`);
-        } else {
-          logger.warn(`Login: No block template available for job creation`);
-        }
+        // Use JobManager to create job with proper originalTemplate
+        this.jobManager.createInitialJob();
+        currentJob = this.getCurrentJob();
       } catch (error) {
         logger.error(`Login: Error creating job: ${error.message}`);
       }
     }
 
             if (currentJob) {
-      logger.debug(
-        `Login: Job details - id: ${currentJob.id}, template: ${currentJob.template ? currentJob.template.index : 'NO_TEMPLATE'}`
-      );
 
             // XMRig expects job data in the login response (as per working cryptonote-nodejs-pool)
       this.sendToClient(clientId, {
@@ -515,11 +474,11 @@ class StratumServer {
           id: clientId,
           job: {
             job_id: currentJob.id,
-            height: currentJob.template.index,
-            timestamp: currentJob.template.timestamp,
-            previous_hash: currentJob.template.previousHash,
-            merkle_root: currentJob.template.merkleRoot,
-            difficulty: currentJob.template.difficulty,
+            height: (currentJob.originalTemplate || currentJob.template).index,
+            timestamp: (currentJob.originalTemplate || currentJob.template).timestamp,
+            previous_hash: (currentJob.originalTemplate || currentJob.template).previousHash,
+            merkle_root: (currentJob.originalTemplate || currentJob.template).merkleRoot,
+            difficulty: (currentJob.originalTemplate || currentJob.template).difficulty,
             pool_difficulty: client.difficulty,
             algo: 'velora'
           },
@@ -530,7 +489,6 @@ class StratumServer {
 
     } else {
       // Fallback if no job available
-      logger.warn(`Login: No current job available, sending response without job`);
       this.sendToClient(clientId, {
         id: id,
         result: {
@@ -540,11 +498,6 @@ class StratumServer {
         error: null,
       });
     }
-
-    // Log that we've completed the full login sequence
-    logger.info(`Completed full login sequence for ${clientId}: job included in login response, client subscribed`);
-
-    logger.info(`Miner '${workerName}' logged in successfully (client: ${clientId})`);
   }
 
   /**
@@ -625,13 +578,13 @@ class StratumServer {
 
       // Store the block in the database
       await this.databaseManager.addBlock(dbBlock);
-      logger.info(`✅ Block stored in database: height ${dbBlock.height}, hash ${dbBlock.hash.substring(0, 16)}...`);
+      logger.info(`Block stored in database: height ${dbBlock.height}, hash ${dbBlock.hash.substring(0, 16)}...`);
 
       // Update pool statistics
       await this.updatePoolStatistics();
 
     } catch (error) {
-      logger.error(`❌ Failed to store block in database: ${error.message}`);
+      logger.error(`Failed to store block in database: ${error.message}`);
       logger.error(`Error stack: ${error.stack}`);
       // Don't throw error to prevent server crash, just log it
     }
@@ -657,7 +610,6 @@ class StratumServer {
       };
 
       await this.databaseManager.updatePoolStats(stats);
-      logger.debug('Pool statistics updated in database');
 
     } catch (error) {
       logger.error(`Failed to update pool statistics: ${error.message}`);
@@ -691,13 +643,18 @@ class StratumServer {
   invalidateJobsForHeight(height) {
     let invalidatedCount = 0;
     try {
+      // 🎯 FIX: Check both template and originalTemplate for height matching
       for (const [jobId, job] of this.jobs.entries()) {
-        if (job && job.template && job.template.index === height) {
-          this.jobs.delete(jobId);
-          invalidatedCount++;
+        if (job) {
+          const jobHeight = (job.originalTemplate && job.originalTemplate.index) || 
+                           (job.template && job.template.index);
+          if (jobHeight === height) {
+            this.jobs.delete(jobId);
+            invalidatedCount++;
+          }
         }
       }
-      logger.info(`🚫 Invalidated ${invalidatedCount} jobs for height ${height}`);
+      logger.info(`Invalidated ${invalidatedCount} jobs for height ${height}`);
     } catch (error) {
       logger.error(`Error invalidating jobs for height ${height}: ${error.message}`);
       logger.error(`Error stack: ${error.stack}`);
@@ -712,32 +669,10 @@ class StratumServer {
       // Force template refresh
       await this.blockTemplateManager.forceUpdate();
 
-      // Get new template
-      const template = this.blockTemplateManager.getCurrentTemplate();
-      if (!template) {
-        logger.error('❌ No template available for job update');
-        return;
-      }
-
-      // Create new job
-      const jobId = this.generateJobId();
-      const job = {
-        id: jobId,
-        template: template,
-        transactions: template.transactions || [],
-        previousHash: template.previousHash || 'unknown',
-        merkleRoot: template.merkleRoot || 'unknown',
-        version: 1,
-        nbits: this.difficultyToBits(template.difficulty || 1),
-        ntime: Math.floor((template.timestamp || Date.now()) / 1000),
-        cleanJobs: true,
-        expiresAt: template.expiresAt || Date.now() + 300000, // 5 minutes default
-      };
-
-      this.jobs.set(jobId, job);
-      this.cleanupOldJobs();
-      this.broadcastNewJob(job);
-      logger.info(`🚀 Immediate job update completed: ${job.id}, height: ${template.index}`);
+      // 🎯 CRITICAL FIX: Use JobManager to update jobs with proper originalTemplate
+      // Force update = true to ensure new job is created even if height hasn't changed
+      this.jobManager.updateJobs(true);
+      logger.info(`Immediate job update completed through JobManager`);
     } catch (error) {
       logger.error(`Error in force job update: ${error.message}`);
       logger.error(`Error stack: ${error.stack}`);
@@ -816,7 +751,6 @@ class StratumServer {
         error: null,
       });
 
-      logger.info(`Client ${clientId} difficulty updated to ${newDifficulty}`);
     } else {
       this.sendError(clientId, id, -1, 'Invalid difficulty value');
     }
@@ -825,22 +759,30 @@ class StratumServer {
   /**
    * Create initial job when pool starts
    */
-  createInitialJob() { /* moved to job-manager */ }
+  createInitialJob() { 
+    return this.jobManager.createInitialJob();
+  }
 
   /**
    * Start job updates
    */
-  startJobUpdates() { /* moved to job-manager */ }
+  startJobUpdates() { 
+    return this.jobManager.startJobUpdates();
+  }
 
   /**
    * Update mining jobs
    */
-  updateJobs() { /* moved to job-manager */ }
+  updateJobs() { 
+    return this.jobManager.updateJobs();
+  }
 
   /**
    * Clean up old jobs
    */
-  cleanupOldJobs() { /* moved to job-manager */ }
+  cleanupOldJobs() { 
+    return this.jobManager.cleanupOldJobs();
+  }
 
     /**
    * Broadcast new job to all clients
@@ -859,22 +801,16 @@ class StratumServer {
         return;
       }
 
-      logger.info(`Attempting to send job to client ${clientId}...`);
-
       let currentJob = this.getCurrentJob();
-      logger.info(`Current job: ${currentJob ? currentJob.id : 'NONE'}`);
 
       // If no job exists, try to create one
       if (!currentJob) {
-        logger.info(`No current job available, attempting to create one for ${clientId}`);
         this.createInitialJob();
         currentJob = this.getCurrentJob();
 
         if (!currentJob) {
-          logger.warn(`Still no job available for ${clientId}`);
           return;
         }
-        logger.info(`Successfully created job ${currentJob.id} for ${clientId}`);
       }
 
       const client = this.clients.get(clientId);
@@ -884,15 +820,8 @@ class StratumServer {
       }
 
       if (!client.subscribed) {
-        logger.warn(`Client ${clientId} not subscribed, cannot send job`);
         return;
       }
-
-      logger.info(`Client ${clientId} is ready to receive job ${currentJob.id}`);
-
-      // Job is now sent in the login response, so this function is simplified
-      logger.info(`Client ${clientId} is ready to receive job updates`);
-      logger.info(`Job ${currentJob.id} was already sent in login response`);
     } catch (error) {
       logger.error(`Error in sendJobToClient for client ${clientId}: ${error.message}`);
       logger.error(`Error stack: ${error.stack}`);
@@ -908,23 +837,15 @@ class StratumServer {
       let latestJob = null;
       let latestTime = 0;
 
-      logger.debug(`getCurrentJob: Total jobs in map: ${this.jobs.size}`);
-
       for (const [jobId, job] of this.jobs.entries()) {
         try {
           if (!job || !job.template) {
-            logger.warn(`Invalid job structure for job ${jobId}, removing`);
             this.jobs.delete(jobId);
             continue;
           }
 
-          logger.debug(
-            `getCurrentJob: Checking job ${jobId}, timestamp: ${job.template.timestamp}, expiresAt: ${job.expiresAt}, currentTime: ${Date.now()}`
-          );
-
           // Check if job is expired
           if (Date.now() > job.expiresAt) {
-            logger.debug(`getCurrentJob: Job ${jobId} is expired, removing`);
             this.jobs.delete(jobId);
             continue;
           }
@@ -940,7 +861,6 @@ class StratumServer {
         }
       }
 
-      logger.debug(`getCurrentJob: Returning job: ${latestJob ? latestJob.id : 'NULL'}`);
       return latestJob;
     } catch (error) {
       logger.error(`Error in getCurrentJob: ${error.message}`);
@@ -1023,9 +943,7 @@ class StratumServer {
           }
 
           const jsonMessage = JSON.stringify(rpcMessage) + '\n';
-          logger.debug(`Sending to ${clientId}: ${jsonMessage.trim()}`);
           client.socket.write(jsonMessage);
-          logger.debug(`Message sent successfully to ${clientId}`);
         } catch (error) {
           logger.error(`Error sending message to ${clientId}: ${error.message}`);
           logger.error(`Error stack: ${error.stack}`);
@@ -1050,12 +968,13 @@ class StratumServer {
         logger.error('Invalid parameters for sendDifficulty');
         return;
       }
-      this.sendToClient(clientId, {
+      logger.info(`Sending difficulty update to ${clientId}: ${difficulty}`);
+      const result = this.sendToClient(clientId, {
         id: null,
         method: 'mining.set_difficulty',
         params: [difficulty],
       });
-      logger.debug(`Set difficulty ${difficulty} for client ${clientId}`);
+      logger.info(`sendToClient result for difficulty update: ${result}`);
     } catch (error) {
       logger.error(`Error in sendDifficulty for client ${clientId}: ${error.message}`);
       logger.error(`Error stack: ${error.stack}`);
@@ -1119,7 +1038,6 @@ class StratumServer {
       const crypto = require('crypto');
       const seedHash = crypto.createHash('sha256').update(seedString).digest('hex');
 
-      logger.debug(`Generated seed hash for block ${blockNumber}, epoch ${epoch}: ${seedHash.substring(0, 16)}...`);
       return seedHash;
     } catch (error) {
       logger.error(`Error generating seed hash: ${error.message}`);
@@ -1169,6 +1087,22 @@ class StratumServer {
         jobs: 0,
         uptime: 0,
       };
+    }
+  }
+
+  /**
+   * Get current network difficulty from block template
+   */
+  getNetworkDifficulty() {
+    try {
+      if (this.blockTemplateManager) {
+        const template = this.blockTemplateManager.getCurrentTemplate();
+        return template ? template.difficulty : null;
+      }
+      return null;
+    } catch (error) {
+      logger.error(`Error getting network difficulty: ${error.message}`);
+      return null;
     }
   }
 }

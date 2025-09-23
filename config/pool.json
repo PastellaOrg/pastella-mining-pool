@@ -3,10 +3,13 @@
     "name": "Pastella Mining Pool",
     "description": "Professional mining pool for Pastella cryptocurrency using Velora algorithm",
     "version": "1.0.0",
+    "coinName": "Pastella",
+    "ticker": "PAS",
+    "decimals": 8,
     "fee": 0.01,
     "minPayout": 0.001,
     "payoutInterval": 3600000,
-    "feeAddress": "1Ggdo3kTzGvmhSDuoZBuFZQeqDSg57FEf6"
+    "feeAddress": "1C9shAVkTSTH2z195Mwp2mrpafbdFrNyvw"
   },
   "http": {
     "port": 3000,
@@ -20,8 +23,8 @@
     "timeout": 30000
   },
   "daemon": {
-    "url": "http://localhost:22000",
-    "apiKey": "",
+    "url": "http://192.168.1.38:22000",
+    "apiKey": "kankerkanker",
     "username": "",
     "password": "",
     "timeout": 30000,
@@ -29,10 +32,11 @@
   },
   "mining": {
     "algorithm": "velora",
-    "startingDifficulty": 100000,
+    "startingDifficulty": 50000,
     "shareTimeout": 300000,
     "maxShareAge": 3600000,
-    "blockTime": 60
+    "blockTime": 15,
+    "templateUpdateInterval": 5000
   },
   "database": {
     "type": "sqlite",
@@ -54,8 +58,14 @@
   },
   "payout": {
     "enabled": true,
-    "minConfirmations": 6,
+    "minConfirmations": 10,
     "batchSize": 50,
-    "gasPrice": "20000000000"
+    "paymentFee": 100000,
+    "paymentInterval": 10000,
+    "minPayout": 0.001,
+    "walletName": "pool",
+    "walletPassword": "kevin11",
+    "walletApiUrl": "http://localhost:3001",
+    "walletApiKey": "kankerkanker"
   }
 }

@@ -10,12 +10,12 @@ class DifficultyManager {
     this.config = config;
 
     // Difficulty adjustment settings
-    this.targetShareInterval = 10; // Target: 1 share every 10 seconds
-    this.adjustmentWindow = 60; // Adjust based on last 60 seconds
-    this.maxDifficultyIncrease = 2.0; // Max 2x increase per adjustment
-    this.maxDifficultyDecrease = 0.5; // Max 50% decrease per adjustment
-    this.minDifficulty = 1; // Minimum difficulty
-    this.maxDifficulty = 1000000; // Maximum difficulty
+    this.targetShareInterval = 6; // Target: 1 share every 6 seconds (10 per minute)
+    this.adjustmentWindow = 120; // Adjust based on last 2 minutes for more stability
+    this.maxDifficultyIncrease = 1.2; // Max 20% increase per adjustment
+    this.maxDifficultyDecrease = 0.8; // Max 20% decrease per adjustment
+    this.minDifficulty = 1000; // Minimum difficulty
+    this.maxDifficulty = Number.MAX_SAFE_INTEGER; // No maximum difficulty - be fair to all miners
 
     // Client tracking
     this.clients = new Map(); // clientId -> client data
@@ -28,8 +28,10 @@ class DifficultyManager {
   /**
    * Register a new client
    */
-  registerClient(clientId) {
-    const startingDifficulty = this.config.get('mining.startingDifficulty') || 100;
+  registerClient(clientId, networkDifficulty = null) {
+    let startingDifficulty = this.config.get('mining.startingDifficulty') || 100;
+    
+    // Use configured starting difficulty to test adjustment system
 
     this.clients.set(clientId, {
       difficulty: startingDifficulty,
@@ -85,8 +87,8 @@ class DifficultyManager {
     const windowStart = now - (this.adjustmentWindow * 1000);
     client.shares = client.shares.filter(share => share.timestamp >= windowStart);
 
-    // Check if we should adjust difficulty
-    this.checkDifficultyAdjustment(clientId);
+    // Don't auto-adjust here - let the submit handler handle it
+    // this.checkDifficultyAdjustment(clientId);
   }
 
   /**
@@ -107,42 +109,51 @@ class DifficultyManager {
     const now = Date.now();
     const timeSinceLastAdjustment = now - client.lastAdjustment;
 
-    // Only adjust every 30 seconds minimum
-    if (timeSinceLastAdjustment < 30000) return;
+    // Only adjust every 60 seconds minimum for stability
+    if (timeSinceLastAdjustment < 60000) {
+      logger.debug(`Client ${clientId}: Too soon for adjustment (${(timeSinceLastAdjustment/1000).toFixed(1)}s < 60s)`);
+      return;
+    }
 
     // Need at least 5 shares in the window to make adjustment
-    if (client.shares.length < 5) return;
+    if (client.shares.length < 5) {
+      logger.debug(`Client ${clientId}: Not enough shares (${client.shares.length} < 5)`);
+      return;
+    }
 
     const windowStart = now - (this.adjustmentWindow * 1000);
     const recentShares = client.shares.filter(share =>
       share.timestamp >= windowStart && share.valid
     );
 
-    if (recentShares.length < 3) return; // Need at least 3 valid shares
+    if (recentShares.length < 3) {
+      logger.debug(`Client ${clientId}: Not enough valid shares in window (${recentShares.length} < 3)`);
+      return;
+    }
 
     // Calculate actual share interval
     const timeSpan = now - recentShares[0].timestamp;
     const actualInterval = timeSpan / (recentShares.length - 1) / 1000; // seconds
 
+    logger.debug(`Client ${clientId}: Checking adjustment - interval: ${actualInterval.toFixed(2)}s, target: ${this.targetShareInterval}s, shares: ${recentShares.length}`);
+
     const oldDifficulty = client.difficulty;
     let newDifficulty = oldDifficulty;
 
-    // Adjust difficulty based on share rate
-    if (actualInterval < this.targetShareInterval * 0.5) {
-      // Shares coming too fast - increase difficulty
-      const multiplier = Math.min(this.maxDifficultyIncrease, this.targetShareInterval / actualInterval);
-      newDifficulty = Math.round(oldDifficulty * multiplier);
+    // Adjust difficulty based on share rate (more conservative)
+    if (actualInterval < this.targetShareInterval * 0.7) {
+      // Shares coming too fast - increase difficulty by max 20%
+      newDifficulty = Math.round(oldDifficulty * this.maxDifficultyIncrease);
       logger.debug(`Client ${clientId}: Shares too fast (${actualInterval.toFixed(1)}s), increasing difficulty`);
 
-    } else if (actualInterval > this.targetShareInterval * 2) {
-      // Shares coming too slow - decrease difficulty
-      const multiplier = Math.max(this.maxDifficultyDecrease, this.targetShareInterval / actualInterval);
-      newDifficulty = Math.round(oldDifficulty * multiplier);
+    } else if (actualInterval > this.targetShareInterval * 1.5) {
+      // Shares coming too slow - decrease difficulty by max 20%
+      newDifficulty = Math.round(oldDifficulty * this.maxDifficultyDecrease);
       logger.debug(`Client ${clientId}: Shares too slow (${actualInterval.toFixed(1)}s), decreasing difficulty`);
     }
 
-    // Apply limits
-    newDifficulty = Math.max(this.minDifficulty, Math.min(this.maxDifficulty, newDifficulty));
+    // Apply minimum limit only (no maximum for fairness)
+    newDifficulty = Math.max(this.minDifficulty, newDifficulty);
 
     // Only adjust if change is significant (at least 10%)
     const changePercent = Math.abs(newDifficulty - oldDifficulty) / oldDifficulty;

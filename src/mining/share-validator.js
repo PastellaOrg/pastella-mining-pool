@@ -3,9 +3,10 @@ const logger = require('../utils/logger.js');
 const axios = require('axios');
 
 class ShareValidator {
-  constructor(config, blockTemplateManager) {
+  constructor(config, blockTemplateManager, stratumServer = null) {
     this.config = config;
     this.blockTemplateManager = blockTemplateManager;
+    this.stratumServer = stratumServer; // 🎯 NEW: Reference to stratum server for job lookup
     this.veloraUtils = new VeloraUtils();
 
     // Share validation settings
@@ -33,6 +34,27 @@ class ShareValidator {
   }
 
   /**
+   * 🎯 CRITICAL FIX: Get original template used for mining from job ID
+   * This ensures we use the EXACT same timestamp and parameters that were sent to miners
+   */
+  getOriginalJobTemplate(jobId) {
+    if (!this.stratumServer) {
+      return this.blockTemplateManager.getCurrentTemplate();
+    }
+
+    const job = this.stratumServer.jobs.get(jobId);
+    if (!job) {
+      return this.blockTemplateManager.getCurrentTemplate();
+    }
+
+    if (!job.originalTemplate) {
+      return job.template || this.blockTemplateManager.getCurrentTemplate();
+    }
+
+    return job.originalTemplate;
+  }
+
+  /**
    * Set database manager
    */
   setDatabaseManager(databaseManager) {
@@ -48,13 +70,28 @@ class ShareValidator {
     }
 
     try {
-      // Find miner ID by address
-      const miners = await this.databaseManager.getMiners();
-      const miner = miners.find(m => m.address === minerAddress);
+      // Find miner ID by address or create new miner
+      let miners = await this.databaseManager.getMiners();
+      let miner = miners.find(m => m.address === minerAddress);
 
       if (!miner) {
-        logger.warn(`Miner not found in database for address: ${minerAddress}`);
-        return;
+        // Create new miner if not found
+        logger.info(`Creating new miner record for address: ${minerAddress}`);
+        await this.databaseManager.addMiner({
+          address: minerAddress,
+          first_seen: Date.now(),
+          last_seen: Date.now(),
+          shares: 0
+        });
+        
+        // Reload miners to get the new miner with ID
+        miners = await this.databaseManager.getMiners();
+        miner = miners.find(m => m.address === minerAddress);
+        
+        if (!miner) {
+          logger.error(`Failed to create or find miner: ${minerAddress}`);
+          return;
+        }
       }
 
       const dbShareData = {
@@ -71,7 +108,6 @@ class ShareValidator {
       };
 
       await this.databaseManager.addShare(dbShareData);
-      logger.debug(`Share stored in database for miner ${minerAddress}, valid: ${isValid}, block: ${isBlock}`);
 
       // Update miner share statistics
       await this.updateMinerShareStats(miner.id);
@@ -123,8 +159,8 @@ class ShareValidator {
         return { valid: false, reason: 'Share is too old' };
       }
 
-      // Get current block template
-      const template = this.blockTemplateManager.getCurrentTemplate();
+      // 🎯 CRITICAL FIX: Get ORIGINAL template from job ID to ensure timestamp consistency
+      const template = this.getOriginalJobTemplate(shareData.jobId);
       if (!template) {
         return { valid: false, reason: 'No block template available' };
       }
@@ -140,9 +176,14 @@ class ShareValidator {
           // Check if we're already processing a block for this height
           const blockHeight = template.index;
           if (this.processingHeights.has(blockHeight)) {
-            logger.warn(`⚠️ Block solution for height ${blockHeight} already being processed, skipping duplicate submission`);
             // Still count it as a block found but don't submit again
             this.stats.blocksFound++;
+            // Create a resolved promise to indicate this block is already being processed
+            validationResult.blockSubmissionPromise = Promise.resolve({
+              success: true,
+              message: 'Block already being processed',
+              duplicate: true
+            });
             return validationResult;
           }
 
@@ -152,26 +193,25 @@ class ShareValidator {
 
           this.stats.blocksFound++;
           this.stats.lastBlockFound = Date.now();
-          logger.info(`🎉 Block found by ${minerAddress}! Hash: ${shareData.hash}`);
+          logger.info(`Block found by ${minerAddress} - hash: ${shareData.hash}`);
 
           // CRITICAL: Submit the block to the daemon and await result
           validationResult.blockSubmissionPromise = this.submitBlockToDaemon(shareData, template, minerAddress)
             .then((result) => {
               if (result && result.success) {
-                logger.info(`✅ Block ${blockHeight} successfully accepted by daemon`);
+                logger.info(`Block ${blockHeight} accepted by daemon`);
               } else {
-                logger.warn(`❌ Block ${blockHeight} rejected by daemon: ${result?.error || 'Unknown error'}`);
+                logger.warn(`Block ${blockHeight} rejected by daemon: ${result?.error || 'Unknown error'}`);
               }
               return result;
             })
             .catch((error) => {
-              logger.error(`❌ Block ${blockHeight} submission error: ${error.message}`);
+              logger.error(`Block ${blockHeight} submission error: ${error.message}`);
               return { success: false, error: error.message };
             })
             .finally(() => {
               // Remove height from processing set when submission is complete
               this.processingHeights.delete(blockHeight);
-              logger.debug(`Removed height ${blockHeight} from processing set`);
             });
         }
 
@@ -203,29 +243,22 @@ class ShareValidator {
   validateShareStructure(shareData) {
     const required = ['jobId', 'nonce', 'timestamp', 'hash', 'difficulty'];
 
-    logger.debug(`Validating share structure. Share data: ${JSON.stringify(shareData)}`);
-
     for (const field of required) {
       if (!shareData.hasOwnProperty(field)) {
-        logger.warn(`Share missing required field: ${field}`);
         return false;
       }
     }
 
     // Validate data types
     if (typeof shareData.nonce !== 'string' || shareData.nonce.length !== 8) {
-      // xmrig sends 8-char nonce, not 16
-      logger.warn(`Invalid nonce format: ${shareData.nonce} (expected 8 hex chars, got ${shareData.nonce.length})`);
       return false;
     }
 
     if (typeof shareData.hash !== 'string' || shareData.hash.length !== 64) {
-      logger.warn(`Invalid hash format: ${shareData.hash} (expected 64 hex chars, got ${shareData.hash.length})`);
       return false;
     }
 
     if (typeof shareData.difficulty !== 'number' || shareData.difficulty <= 0) {
-      logger.warn(`Invalid difficulty: ${shareData.difficulty}`);
       return false;
     }
 
@@ -253,30 +286,13 @@ class ShareValidator {
         return { valid: false, reason: 'Invalid nonce format' };
       }
 
-      // Trust the hash calculated by xmrig (it has already done the proof-of-work)
-      // In a production environment, you might want to spot-check hashes occasionally
-      logger.debug(`Accepting hash from miner: ${shareData.hash}`);
-
       // Check if hash meets pool difficulty requirements (not network difficulty)
       const hashValue = BigInt('0x' + shareData.hash);
-      const shareTarget = BigInt(2) ** BigInt(256) / BigInt(shareData.difficulty); // Use pool difficulty
-
-      // DEBUG: Add detailed logging
-      logger.debug(`Share validation debug:`);
-      logger.debug(`  Hash: ${shareData.hash}`);
-      logger.debug(`  Pool Difficulty: ${shareData.difficulty}`);
-      logger.debug(`  Hash Value: ${hashValue.toString()}`);
-      logger.debug(`  Share Target: ${shareTarget.toString()}`);
-      logger.debug(`  Hash <= Target: ${hashValue <= shareTarget}`);
+      const shareTarget = BigInt(2) ** BigInt(256) / BigInt(shareData.difficulty);
 
       if (hashValue > shareTarget) {
-        logger.warn(`Share rejected: hash ${shareData.hash.substring(0, 16)}... does not meet pool difficulty ${shareData.difficulty}`);
-        logger.warn(`  Hash Value: ${hashValue.toString()}`);
-        logger.warn(`  Share Target: ${shareTarget.toString()}`);
         return { valid: false, reason: 'Hash does not meet pool difficulty requirement' };
       }
-
-      logger.info(`✅ Share accepted from ${minerAddress} - meets pool difficulty ${shareData.difficulty}`);
 
       // Check if this is a block solution (meets block difficulty)
       const blockTarget = BigInt(2) ** BigInt(256) / BigInt(template.difficulty);
@@ -322,20 +338,8 @@ class ShareValidator {
    */
   validateBlockSolution(blockData, minerAddress) {
     try {
-      // Debug: Log the block data at the start of validation
-      logger.debug(`validateBlockSolution input - Block data keys: ${Object.keys(blockData)}`);
-      logger.debug(`validateBlockSolution input - Block data: ${JSON.stringify(blockData, null, 2)}`);
-      logger.debug(`validateBlockSolution input - Hash value: ${blockData.hash}`);
-      logger.debug(`validateBlockSolution input - Hash type: ${typeof blockData.hash}`);
-
-      const template = this.blockTemplateManager.getCurrentTemplate();
-      if (!template) {
-        return { valid: false, reason: 'No block template available' };
-      }
-
       // First validate that the hash exists and is properly formatted
       if (!blockData.hash || blockData.hash.length !== 64) {
-        logger.error(`Invalid hash format for miner ${minerAddress}: ${blockData.hash}`);
         return { valid: false, reason: 'Invalid hash format' };
       }
 
@@ -349,46 +353,19 @@ class ShareValidator {
       const networkDifficulty = template.difficulty;
       const blockTarget = BigInt(2) ** BigInt(256) / BigInt(networkDifficulty);
 
-      logger.debug(
-        `Using network difficulty ${networkDifficulty} for block validation`
-      );
-
-      logger.debug(`Block difficulty validation:`);
-      logger.debug(`  Hash: ${blockData.hash}`);
-      logger.debug(`  Hash Value: ${hashValue.toString(16)}`);
-      logger.debug(`  Block Target: ${blockTarget.toString(16)}`);
-      logger.debug(`  Network Difficulty: ${networkDifficulty}`);
-      logger.debug(`  Hash <= Target? ${hashValue <= blockTarget}`);
-
       if (hashValue > blockTarget) {
-        logger.error(`Hash does not meet BLOCK difficulty requirement for miner ${minerAddress}`);
-        logger.error(
-          `Hash: ${hashValue.toString(16)}, Block Target: ${blockTarget.toString(16)}, Network Difficulty: ${networkDifficulty}`
-        );
         return { valid: false, reason: 'Hash does not meet block difficulty requirement' };
       }
 
       // Update block difficulty to template difficulty for submission
       blockData.difficulty = template.difficulty;
-      logger.debug(`Updated block difficulty to template difficulty: ${template.difficulty}`);
-
-      // Debug: Log timestamp values for troubleshooting
-      logger.debug(`Template timestamp: ${template.timestamp} (type: ${typeof template.timestamp})`);
-      logger.debug(`Block timestamp: ${blockData.timestamp} (type: ${typeof blockData.timestamp})`);
-      logger.debug(`Template timestamp in seconds: ${Math.floor(template.timestamp / 1000)}`);
-      logger.debug(`Block timestamp in seconds: ${Math.floor(blockData.timestamp / 1000)}`);
 
       // Validate timestamp (should be close to template timestamp
       // Both timestamps are now in milliseconds, so we can compare directly
       const timeDiff = Math.abs(blockData.timestamp - template.timestamp);
       if (timeDiff > 300000) { // 5 minutes tolerance in milliseconds
-        logger.warn(`Block timestamp too far from template: ${timeDiff}ms (template: ${template.timestamp}ms, block: ${blockData.timestamp}ms)`);
         return { valid: false, reason: 'Block timestamp too old' };
       }
-
-      // Debug: Log the block data at the end of validation to ensure it wasn't modified
-      logger.debug(`validateBlockSolution output - Block data keys: ${Object.keys(blockData)}`);
-      logger.debug(`validateBlockSolution output - Block data: ${JSON.stringify(blockData, null, 2)}`);
 
       return {
         valid: true,
@@ -549,9 +526,14 @@ class ShareValidator {
         throw new Error(`Template missing required fields: index=${template.index}, timestamp=${template.timestamp}, previousHash=${template.previousHash}, merkleRoot=${template.merkleRoot}, difficulty=${template.difficulty}`);
       }
 
+      // CRITICAL FIX: Use the job template timestamp that was sent to the miner
+      // This should match what the miner used for hashing, but there's a miner bug
+      // where it uses an inconsistent timestamp. For now, use the job template timestamp.
+      const jobTimestamp = template.timestamp; // Use the job timestamp that was sent to miner
+
       const blockData = {
         index: template.index,
-        timestamp: template.timestamp, // Use template timestamp (daemon expects this)
+        timestamp: jobTimestamp, // Use job timestamp that should have been used by miner
         transactions: template.transactions || [],
         previousHash: template.previousHash,
         nonce: parseInt(nonce, 16), // Convert hex nonce to decimal for daemon
@@ -562,13 +544,12 @@ class ShareValidator {
       };
 
       logger.debug(
-        `CRITICAL FIX: Using template timestamp ${template.timestamp}ms for daemon submission (XMRig used ${shareData.timestamp}s for hashing)`
       );
       logger.debug(
-        `XMRig used: nonce=${nonce} (hex), timestamp=${shareData.timestamp}s, difficulty=${template.difficulty}`
+        `XMRig used: nonce=${nonce} (hex), nTime=${shareData.timestamp}s (different from job timestamp), difficulty=${template.difficulty}`
       );
       logger.debug(
-        `Daemon will receive: nonce=${parseInt(nonce, 16)} (decimal), timestamp=${template.timestamp}ms, difficulty=${template.difficulty}`
+        `Daemon will receive: nonce=${parseInt(nonce, 16)} (decimal), timestamp=${jobTimestamp}ms, difficulty=${template.difficulty}`
       );
 
       // Ensure no extra fields are present
@@ -592,55 +573,27 @@ class ShareValidator {
         extraFields.forEach(field => delete blockData[field]);
       }
 
-      // SIMPLIFIED: Use miner's calculated hash directly since we now send structured data
+      // CRITICAL FIX: Use miner's calculated hash directly - don't recalculate!
       const minerHash = shareData.hash || shareData.result;
-
-      // For daemon submission, recalculate hash with exact same parameters as miner
-      const VeloraUtils = require('../utils/velora');
-      const vu = new VeloraUtils();
-
-      // Verify miner's hash using block difficulty (what miner actually used for hash calculation)
-      const blockDifficulty = blockData.difficulty; // Miner now uses block difficulty for hash calculation
-
-      const minerVerificationHash = vu.veloraHash(
-        blockData.index,
-        blockData.nonce,
-        blockData.timestamp,
-        blockData.previousHash,
-        blockData.merkleRoot,
-        blockDifficulty, // Use block difficulty for verification (same as miner)
-        null
-      );
-
-      // Since miner and daemon both use block difficulty, verification hash = daemon hash
-      const daemonHash = minerVerificationHash;
-
-      // Set the daemon hash for submission
-      blockData.hash = daemonHash;
-
-                        // Log for debugging
-      logger.debug(`Miner calculated hash: ${minerHash}`);
-      logger.debug(`Pool verification hash (block difficulty ${blockDifficulty}): ${minerVerificationHash}`);
-      logger.debug(`Daemon submission hash: ${daemonHash} (same as verification)`);
-      logger.debug(`Miner hash verification: ${minerHash === minerVerificationHash ? '✅ MATCH' : '❌ MISMATCH'}`);
-
-      if (minerHash === minerVerificationHash) {
-        logger.debug(`✅ Miner hash verification SUCCESS - perfect match with block difficulty`);
-        logger.debug(`Submitting to daemon: ${daemonHash}`);
-      } else {
-        logger.debug(`❌ Miner hash verification FAILED - parameters still mismatched`);
-        logger.debug(`Using pool calculated hash anyway: ${daemonHash}`);
+      
+      if (!minerHash) {
+        throw new Error('No hash provided by miner');
       }
 
-      logger.debug(`Using daemon hash for submission: ${daemonHash}`);
-      logger.debug(`Block data for hash calculation (matching XMRig parameters):`);
+      // TRUST THE MINER'S HASH: The miner has already done the proof-of-work
+      // The daemon will validate the hash matches the block parameters
+      blockData.hash = minerHash;
+
+      // Log for debugging
+      logger.debug(`Using miner hash directly for daemon submission: ${minerHash}`);
+      logger.debug(`Block data for hash calculation:`);
       logger.debug(`  Index: ${blockData.index}`);
       logger.debug(`  Nonce: ${blockData.nonce} (decimal, from hex ${nonce})`);
-      logger.debug(`  Timestamp: ${template.timestamp}ms (template timestamp for daemon submission)`);
+      logger.debug(`  Timestamp: ${jobTimestamp}ms (job template timestamp for daemon submission)`);
       logger.debug(`  Previous Hash: ${blockData.previousHash}`);
       logger.debug(`  Merkle Root: ${blockData.merkleRoot}`);
       logger.debug(`  Difficulty: ${blockData.difficulty}`);
-      logger.debug(`  XMRig timestamp was: ${shareData.timestamp}s (used for hashing, not submission)`);
+      logger.debug(`  Miner nTime was: ${shareData.timestamp * 1000}ms (not used for hash calculation)`);
 
       logger.debug(
         `Built block data: index=${blockData.index}, nonce=${blockData.nonce} (decimal), hash=${blockData.hash?.substring(0, 16) || 'undefined'}...`
@@ -727,7 +680,6 @@ class ShareValidator {
     let blockHeight;
     try {
       blockHeight = template.index || 'unknown';
-      logger.debug(`🚀 Submitting block to daemon for height ${blockHeight}...`);
 
       // Validate inputs
       if (!shareData || !template || !minerAddress) {
@@ -785,7 +737,6 @@ class ShareValidator {
         // Continue with block submission anyway
       }
 
-      logger.debug(`📤 Submitting block ${blockHeight} to daemon...`);
 
       // Prepare headers for daemon request
       const headers = {
@@ -830,7 +781,7 @@ class ShareValidator {
       );
 
             if (response.status === 200) {
-        logger.info(`✅ Block ${blockHeight} ACCEPTED by daemon - block is valid!`);
+        logger.info(`Block ${blockHeight} accepted by daemon`);
         logger.debug(`Daemon response: ${JSON.stringify(response.data)}`);
 
         // Update statistics
@@ -847,7 +798,7 @@ class ShareValidator {
           daemonResponse: response.data
         };
       } else {
-        logger.error(`❌ Block ${blockHeight} REJECTED by daemon - block is invalid (status: ${response.status})`);
+        logger.error(`Block ${blockHeight} rejected by daemon (status: ${response.status})`);
         logger.debug(`Daemon error response: ${JSON.stringify(response.data)}`);
         this.stats.blocksRejected++;
 
@@ -859,7 +810,7 @@ class ShareValidator {
       }
 
     } catch (error) {
-      logger.error(`❌ Block submission failed for height ${blockHeight || 'unknown'}: ${error.message}`);
+      logger.error(`Block submission failed for height ${blockHeight || 'unknown'}: ${error.message}`);
       logger.debug(`Error stack: ${error.stack}`);
 
       // Update statistics for failed submissions
@@ -885,7 +836,7 @@ class ShareValidator {
         const errorMessage = error.response.data?.error || 'Unknown error';
         
         if (statusCode === 400) {
-          logger.warn(`❌ Block rejected by daemon - likely invalid block solution (status 400)`);
+          logger.warn(`Block rejected by daemon - likely invalid block solution (status 400)`);
           logger.warn(`   Daemon message: ${errorMessage}`);
           logger.warn(`   This indicates the hash does not meet network difficulty requirements`);
         }

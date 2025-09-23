@@ -3,12 +3,16 @@ const path = require('path');
 const cors = require('cors');
 const axios = require('axios');
 
+// Import atomic units utility
+const { fromAtomicUnits } = require('./utils/atomicUnits.js');
+
 // Import components
 const ConfigManager = require('./config/config-manager.js');
 const DatabaseManager = require('./database/database-manager.js');
 const BlockTemplateManager = require('./mining/block-template-manager.js');
 const ShareValidator = require('./mining/share-validator.js');
 const StratumServer = require('./stratum/stratum-server.js');
+const PaymentProcessor = require('./payments/payment-processor.js');
 const logger = require('./utils/logger.js');
 
 class MiningPool {
@@ -18,19 +22,33 @@ class MiningPool {
     this.blockTemplateManager = new BlockTemplateManager(this.config);
     this.shareValidator = new ShareValidator(this.config, this.blockTemplateManager);
     this.stratumServer = new StratumServer(this.config);
+    this.paymentProcessor = new PaymentProcessor(this);
 
     // Set up component connections
     this.stratumServer.setShareValidator(this.shareValidator);
     this.stratumServer.setBlockTemplateManager(this.blockTemplateManager);
     this.stratumServer.setDatabaseManager(this.database);
 
-    // Set database manager for share validator
-    this.shareValidator.setDatabaseManager(this.database);
+    // 🎯 CRITICAL FIX: Set stratum server reference in share validator for job tracking
+    this.shareValidator.stratumServer = this.stratumServer;
+    this.shareValidator.databaseManager = this.database;
+
+    // Set up immediate job updates when new templates are available
+    this.blockTemplateManager.setNewTemplateCallback((template) => {
+      this.stratumServer.jobManager.updateJobs();
+    });
 
     // Express app
     this.app = express();
     this.server = null;
     this.isRunning = false;
+
+    // Network data caching (15 second cache)
+    this.networkCache = {
+      data: null,
+      timestamp: 0,
+      ttl: 15000 // 15 seconds
+    };
 
     // Statistics
     this.stats = {
@@ -56,7 +74,6 @@ class MiningPool {
 
     // Add request logging
     this.app.use((req, res, next) => {
-      logger.debug(`${req.method} ${req.path} from ${req.ip}`);
       next();
     });
   }
@@ -75,11 +92,47 @@ class MiningPool {
     });
 
     // Pool status
-    this.app.get('/api/status', (req, res) => {
+    this.app.get('/api/status', async (req, res) => {
       try {
         const template = this.blockTemplateManager.getTemplateInfo();
         const stratumStats = this.stratumServer.getStats();
         const shareStats = this.shareValidator.getStats();
+
+        // Get additional statistics for performance metrics
+        const recentBlocks = await this.database.getBlocks(10, 0);
+        const totalBlocksFound = await this.database.getBlocksCount();
+        const allMiners = await this.database.getMiners();
+        // TODO: Implement payment tracking system
+        const totalPayments = 0; // Placeholder until payment system is implemented
+
+        // Calculate average block time from recent blocks
+        let avgBlockTime = 0;
+        const targetBlockTime = this.config.get('daemon.blockTime') || 15; // Get from config, default to 15 seconds
+        let avgBlockTimeDisplay = `${targetBlockTime}s`; // Default to config block time
+
+        if (recentBlocks && recentBlocks.length > 1) {
+          const blockTimes = [];
+          for (let i = 1; i < recentBlocks.length; i++) {
+            const timeDiff = recentBlocks[i-1].created_at - recentBlocks[i].created_at;
+            if (timeDiff > 0) blockTimes.push(timeDiff);
+          }
+          if (blockTimes.length > 0) {
+            avgBlockTime = blockTimes.reduce((a, b) => a + b, 0) / blockTimes.length;
+            avgBlockTimeDisplay = Math.round(avgBlockTime / 1000); // Convert to seconds for display
+          }
+        } else if (recentBlocks && recentBlocks.length === 1) {
+          // Only one block found, can't calculate average, show time since first block
+          const timeSinceFirst = Date.now() - recentBlocks[0].created_at;
+          avgBlockTimeDisplay = `${Math.round(timeSinceFirst / (1000 * 60))}m+`;
+        } else {
+          // No blocks found yet by this pool, show config block time
+          avgBlockTimeDisplay = `${targetBlockTime}s`;
+        }
+
+        // If no calculation possible, use configured block time
+        if (avgBlockTime === 0) {
+          avgBlockTime = targetBlockTime * 1000; // Convert to milliseconds for internal calculations
+        }
 
         const status = {
           pool: {
@@ -90,9 +143,12 @@ class MiningPool {
             minPayout: this.config.get('pool.minPayout'),
           },
           mining: {
-            template: template,
+            blockHeight: template.available ? template.index : 0,
             poolDifficulty: template.available ? template.poolDifficulty : 0,
             blockDifficulty: template.available ? template.difficulty : 0,
+            transactionCount: template.available ? template.transactionCount : 0,
+            templateAge: template.available ? template.age : 0,
+            // Sensitive template data excluded for security
           },
           stratum: {
             connections: stratumStats.activeConnections,
@@ -103,6 +159,13 @@ class MiningPool {
               invalid: shareStats.invalidShares,
               rate: shareStats.validShareRate,
             },
+          },
+          performance: {
+            avgBlockTime: avgBlockTimeDisplay,
+            totalMiners: allMiners.length,
+            totalPaid: totalPayments || 0,
+            blocksFound: totalBlocksFound,
+            networkDifficulty: template.available ? template.difficulty : 0
           },
           uptime: process.uptime(),
           timestamp: new Date().toISOString(),
@@ -264,6 +327,152 @@ class MiningPool {
       }
     });
 
+    // Get miners grouped by address (fixes duplicate address issue)
+    this.app.get('/api/miners/grouped', async (req, res) => {
+      try {
+        const groupedMiners = await this.database.getMinersGroupedByAddress();
+        
+        res.json({
+          miners: groupedMiners.map(group => ({
+            address: group.address,
+            worker_count: group.worker_count,
+            total_hashrate: group.total_hashrate,
+            total_shares: group.total_shares,
+            last_seen: group.last_seen,
+            first_seen: group.first_seen,
+            worker_names: group.worker_names ? group.worker_names.split(',') : [],
+            worker_ids: group.worker_ids ? group.worker_ids.split(',') : [],
+            is_online: (Date.now() - group.last_seen) < 300000 // Online if seen within 5 minutes
+          }))
+        });
+      } catch (error) {
+        logger.error(`Error getting grouped miners: ${error.message}`);
+        res.status(500).json({ error: 'Internal server error' });
+      }
+    });
+
+    // Get miner stats by wallet address (for miner lookup page)
+    this.app.get('/api/miners/address/:address', async (req, res) => {
+      try {
+        const address = req.params.address;
+        const miners = await this.database.all('SELECT * FROM miners WHERE address = ? ORDER BY last_seen DESC', [address]);
+        
+        // Try to get persistent leaderboard data for enhanced stats
+        const leaderboardData = await this.database.getMinerFromLeaderboard(address);
+        const latestStats = await this.database.getLatestMinerStats(address);
+        
+        // If no active miners but we have historical data, show current status (zeros) with historical totals
+        if (miners.length === 0 && (leaderboardData || latestStats)) {
+          const persistentData = leaderboardData || {};
+          const statsData = latestStats || {};
+          
+          // Get recent shares for this address (even from historical data)
+          // Use composite key approach since miner records might be cleaned up
+          const recentShares = await this.database.all(
+            `SELECT s.*
+            FROM shares s
+            WHERE s.miner_id LIKE ? 
+            ORDER BY s.timestamp DESC LIMIT 20`,
+            [`${address}.%`]
+          );
+
+          return res.json({
+            address: address,
+            worker_count: 0, // No active workers
+            total_hashrate: 0, // No current hashrate
+            avg_hashrate_1h: 0, // No current hashrate
+            avg_hashrate_3h: 0, // No current hashrate
+            avg_hashrate_24h: 0, // No current hashrate
+            total_shares: persistentData.total_shares || 0, // Keep historical share count
+            valid_shares: persistentData.valid_shares || 0,
+            rejected_shares: persistentData.rejected_shares || 0,
+            blocks_found: persistentData.blocks_found || 0,
+            confirmed_balance: fromAtomicUnits(persistentData.confirmed_balance || 0),
+            unconfirmed_balance: fromAtomicUnits(persistentData.unconfirmed_balance || 0),
+            total_paid: fromAtomicUnits(persistentData.total_paid || 0),
+            last_seen: persistentData.last_active || 0,
+            first_seen: persistentData.first_seen || 0,
+            is_online: false,
+            is_persistent: true,
+            workers: [],
+            recent_shares: recentShares.map(share => ({
+              timestamp: share.timestamp,
+              difficulty: share.difficulty,
+              valid: share.is_valid === 1,
+              worker_name: share.worker_name,
+              is_block: share.is_block === 1,
+              block_height: null
+            }))
+          });
+        }
+
+        // If no miners found and no historical data
+        if (miners.length === 0) {
+          return res.status(404).json({ error: 'No miners found for this address' });
+        }
+
+        // Get combined statistics for all workers under this address
+        const totalHashrate = miners.reduce((sum, miner) => sum + (miner.hashrate || 0), 0);
+        const totalShares = miners.reduce((sum, miner) => sum + (miner.shares || 0), 0);
+        const lastSeen = Math.max(...miners.map(miner => miner.last_seen));
+        const firstSeen = Math.min(...miners.map(miner => miner.created_at));
+
+        // Get enhanced share stats
+        const shareStats = await this.database.getMinerShareStats(miners[0].id);
+
+        // Get recent shares with block height for this address (increased to 120)
+        const recentShares = await this.database.all(
+          `SELECT s.*
+          FROM shares s
+          WHERE miner_id IN (SELECT id FROM miners WHERE address = ?) 
+          ORDER BY s.timestamp DESC LIMIT 20`,
+          [address]
+        );
+
+        // Calculate average hashrates from history
+        const avgHashrates = await this.database.calculateMinerAverageHashrates(address);
+
+        res.json({
+          address: address,
+          worker_count: miners.length,
+          total_hashrate: totalHashrate,
+          avg_hashrate_1h: avgHashrates.avg_hashrate_1h,
+          avg_hashrate_3h: avgHashrates.avg_hashrate_3h,
+          avg_hashrate_24h: avgHashrates.avg_hashrate_24h,
+          total_shares: shareStats.total_shares || totalShares,
+          valid_shares: shareStats.valid_shares || 0,
+          rejected_shares: shareStats.rejected_shares || 0,
+          blocks_found: shareStats.blocks_found || 0,
+          confirmed_balance: fromAtomicUnits(leaderboardData?.confirmed_balance || 0),
+          unconfirmed_balance: fromAtomicUnits(leaderboardData?.unconfirmed_balance || 0),
+          total_paid: fromAtomicUnits(leaderboardData?.total_paid || 0),
+          last_seen: lastSeen,
+          first_seen: firstSeen,
+          is_online: (Date.now() - lastSeen) < 300000, // Online if seen within 5 minutes
+          is_persistent: false,
+          workers: miners.map(miner => ({
+            id: miner.id,
+            worker_name: miner.worker_name,
+            hashrate: miner.hashrate,
+            shares: miner.shares,
+            last_seen: miner.last_seen,
+            created_at: miner.created_at
+          })),
+          recent_shares: recentShares.map(share => ({
+            timestamp: share.timestamp,
+            difficulty: share.difficulty,
+            valid: share.is_valid === 1,
+            worker_name: share.worker_name,
+            is_block: share.is_block === 1,
+            block_height: null
+          }))
+        });
+      } catch (error) {
+        logger.error(`Error getting miner by address ${req.params.address}: ${error.message}`);
+        res.status(500).json({ error: 'Internal server error' });
+      }
+    });
+
     // Mining shares (hybrid database and in-memory stats)
     this.app.get('/api/shares/stats', async (req, res) => {
       try {
@@ -350,13 +559,89 @@ class MiningPool {
       }
     });
 
-    // Block template
+    // Block template (frontend-safe version)
     this.app.get('/api/block-template', (req, res) => {
       try {
         const template = this.blockTemplateManager.getTemplateInfo();
-        res.json(template);
+        
+        // Only send frontend-safe data, exclude sensitive mining information
+        const frontendSafeTemplate = {
+          available: template.available,
+          index: template.index,
+          difficulty: template.difficulty,
+          poolDifficulty: template.poolDifficulty,
+          transactionCount: template.transactionCount,
+          expiresAt: template.expiresAt,
+          lastUpdate: template.lastUpdate,
+          age: template.age,
+          // Sensitive data excluded: merkleRoot, coinbase, previousHash, timestamp
+        };
+        
+        res.json(frontendSafeTemplate);
       } catch (error) {
         logger.error(`Error getting block template: ${error.message}`);
+        res.status(500).json({ error: 'Internal server error' });
+      }
+    });
+
+    // Per-block rewards for all miners
+    this.app.get('/api/rewards/blocks', async (req, res) => {
+      try {
+        const limit = parseInt(req.query.limit) || 50;
+        const blockRewards = await this.database.getBlockRewards(limit);
+
+        res.json({
+          rewards: blockRewards.map(reward => ({
+            block_height: reward.block_height,
+            block_hash: reward.block_hash,
+            miner_address: reward.miner_address,
+            base_reward: reward.base_reward,
+            pool_fee: reward.pool_fee,
+            miner_reward: reward.miner_reward,
+            miner_percentage: reward.miner_percentage,
+            block_status: reward.block_status || 'pending',
+            timestamp: reward.timestamp
+          })),
+          timestamp: new Date().toISOString()
+        });
+      } catch (error) {
+        logger.error(`Error getting block rewards: ${error.message}`);
+        res.status(500).json({ error: 'Internal server error' });
+      }
+    });
+
+    // Per-block rewards for specific miner address
+    this.app.get('/api/miners/address/:address/rewards', async (req, res) => {
+      try {
+        const address = req.params.address;
+        const limit = parseInt(req.query.limit) || 100;
+        const blockRewards = await this.database.getMinerBlockRewards(address, limit);
+        const balanceInfo = await this.database.getMinerBalance(address);
+
+        // Convert atomic units to PAS for balance display
+        const { fromAtomicUnits } = require('./utils/atomicUnits.js');
+
+        res.json({
+          address: address,
+          rewards: blockRewards.map(reward => ({
+            block_height: reward.block_height,
+            block_hash: reward.block_hash.length > 20 ? reward.block_hash.substring(0, 16) + '...' : reward.block_hash,
+            base_reward: reward.base_reward,
+            pool_fee: reward.pool_fee,
+            miner_reward: reward.miner_reward,
+            miner_percentage: reward.miner_percentage,
+            block_status: this.getBlockStatus(reward.block_height),
+            timestamp: reward.timestamp
+          })),
+          total_rewards: blockRewards.reduce((sum, reward) => sum + reward.miner_reward, 0),
+          blocks_found: blockRewards.length,
+          confirmed_balance: fromAtomicUnits(await this.database.calculateConfirmedBalance(req.params.address)),
+          unconfirmed_balance: fromAtomicUnits(await this.database.calculateUnconfirmedBalance(req.params.address)),
+          total_paid: fromAtomicUnits(balanceInfo.total_paid || 0),
+          timestamp: new Date().toISOString()
+        });
+      } catch (error) {
+        logger.error(`Error getting miner rewards for ${req.params.address}: ${error.message}`);
         res.status(500).json({ error: 'Internal server error' });
       }
     });
@@ -616,18 +901,52 @@ class MiningPool {
       }
     });
 
-    // Payment history
-    this.app.get('/api/payments', (req, res) => {
+    // Payment history endpoint
+    this.app.get('/api/payments', async (req, res) => {
       try {
-        // For now, return empty array since we haven't implemented payment processing yet
-        // In a real implementation, this would query the database for payment history
+        const limit = parseInt(req.query.limit) || 50;
+        const offset = parseInt(req.query.offset) || 0;
+        const minerAddress = req.query.address;
+
+        const payments = await this.paymentProcessor.getPaymentHistory(minerAddress, limit, offset);
+        const stats = await this.paymentProcessor.getPaymentStats();
+
         res.json({
-          payments: [],
-          count: 0,
+          payments: payments.map(payment => ({
+            id: payment.id,
+            batchId: payment.batch_id,
+            txId: payment.transaction_id || '',
+            address: payment.miner_address || '',
+            amount: fromAtomicUnits(payment.amount_atomic || 0),
+            fee: fromAtomicUnits(payment.fee_atomic || 0),
+            netAmount: fromAtomicUnits(payment.net_amount_atomic || 0),
+            status: payment.status || 'unknown',
+            errorMessage: payment.error_message,
+            paymentType: payment.payment_type || 'auto',
+            timestamp: payment.created_at || Date.now(),
+            confirmedAt: payment.confirmed_at
+          })),
+          stats: stats,
+          count: payments.length,
           timestamp: new Date().toISOString(),
         });
       } catch (error) {
         logger.error(`Error getting payments: ${error.message}`);
+        res.status(500).json({ error: 'Internal server error' });
+      }
+    });
+
+    // Payment stats endpoint
+    this.app.get('/api/payments/stats', async (req, res) => {
+      try {
+        const stats = await this.paymentProcessor.getPaymentStats();
+        res.json({
+          success: true,
+          data: stats,
+          timestamp: new Date().toISOString()
+        });
+      } catch (error) {
+        logger.error(`Error getting payment stats: ${error.message}`);
         res.status(500).json({ error: 'Internal server error' });
       }
     });
@@ -674,10 +993,12 @@ class MiningPool {
         const poolEfficiency = totalShareStats?.total_shares > 0 ? 
           ((totalShareStats.valid_shares / totalShareStats.total_shares) * 100).toFixed(2) : 0;
 
-        // Calculate network hashrate using current difficulty and block time
-        const blockTime = this.config.get('mining.blockTime') || 60; // seconds
+        // 🎯 VELORA-SPECIFIC NETWORK HASHRATE CALCULATION
+        // Calibrated for Velora algorithm based on actual mining data
+        const blockTime = this.config.get('mining.blockTime') || 60; // Still needed for API responses
         const networkDifficulty = template?.difficulty || 0;
-        const networkHashrate = networkDifficulty > 0 ? (networkDifficulty / blockTime) : 0;
+        const hashratePerDifficulty = 0.24; // H/s per difficulty unit (tuned for Velora)
+        const networkHashrate = networkDifficulty > 0 ? (networkDifficulty * hashratePerDifficulty) : 0;
         
         // Calculate network share percentage
         const networkShare = networkHashrate > 0 && totalHashrate > 0 ? 
@@ -740,126 +1061,102 @@ class MiningPool {
       }
     });
 
-    // Network statistics endpoint
+    // Network statistics endpoint with 15-second caching
     this.app.get('/api/network', async (req, res) => {
       try {
-        const template = this.blockTemplateManager.getCurrentTemplate();
-        const daemonConfig = this.config.getDaemonConfig();
-        const daemonStatus = await this.getDaemonStatus(daemonConfig);
-        const totalHashrate = this.stratumServer.calculateTotalHashrate();
-        const totalShareStats = await this.database.getTotalShareStats();
-
-        // Calculate network hashrate using difficulty and block time from config
-        const blockTime = this.config.get('mining.blockTime') || 60; // seconds
-        const networkDifficulty = template?.difficulty || 0;
-        const networkHashrate = networkDifficulty > 0 ? (networkDifficulty / blockTime) : 0;
-        
-        // Calculate pool's share of network hashrate
-        const poolPercentage = networkHashrate > 0 && totalHashrate > 0 ? 
-          ((totalHashrate / networkHashrate) * 100).toFixed(4) : '0.0000';
-        
-        // Pool efficiency from database stats
-        const poolEfficiency = totalShareStats?.total_shares > 0 ? 
-          ((totalShareStats.valid_shares / totalShareStats.total_shares) * 100).toFixed(2) : '0.00';
-
-        // Get additional network info from daemon if available
-        let networkInfo = {};
-        if (daemonStatus.connected) {
-          try {
-            const networkResponse = await axios.get(`${daemonConfig.url}/api/blockchain/status`, {
-              headers: daemonConfig.apiKey ? { 'X-API-Key': daemonConfig.apiKey } : {},
-              timeout: 5000
-            });
-            networkInfo = networkResponse.data;
-          } catch (error) {
-            logger.warn(`Failed to get network info: ${error.message}`);
-          }
-        }
-
-        res.json({
-          daemon: {
-            connected: daemonStatus.connected,
-            url: daemonConfig.url,
-            status: daemonStatus.status,
-            error: daemonStatus.error
-          },
-          blockchain: {
-            height: template?.index || networkInfo.height || 0,
-            difficulty: networkDifficulty,
-            blockTime: blockTime,
-            lastBlock: template?.timestamp || networkInfo.lastBlock || null,
-            pendingTransactions: template?.transactions?.length || 0
-          },
-          pool: {
-            hashrate: totalHashrate,
-            miners: this.stratumServer.getStats().activeConnections,
-            efficiency: parseFloat(poolEfficiency),
-            blocksFound: totalShareStats?.blocks_found || 0,
-            networkHashrate: networkHashrate,
-            poolPercentage: parseFloat(poolPercentage)
-          },
-          network: {
-            hashrate: networkHashrate,
-            difficulty: networkDifficulty,
-            blockTime: blockTime,
-            algorithm: this.config.get('mining.algorithm')
-          },
-          timestamp: new Date().toISOString()
-        });
+        const networkData = await this.getCachedNetworkData();
+        res.json(networkData);
       } catch (error) {
         logger.error(`Error getting network stats: ${error.message}`);
         res.status(500).json({ error: 'Internal server error' });
       }
     });
 
-    // Miner leaderboard endpoint
+    // Miner leaderboard endpoint with database persistence
     this.app.get('/api/leaderboard', async (req, res) => {
       try {
         const timeRange = req.query.range || '24h';
         const limit = parseInt(req.query.limit) || 20;
         
-        // Get all miners with their stats
-        const miners = await this.database.getMiners();
-        const currentHashrateData = await this.stratumServer.clients ? 
-          Array.from(this.stratumServer.clients.values()).filter(c => c.authorized) : [];
+        // Try to get from database first for persistent leaderboard
+        let leaderboard = await this.database.getLeaderboard(limit);
+        
+        // If no persistent data or requesting fresh data, build from active miners
+        if (leaderboard.length === 0 || req.query.fresh === 'true') {
+          const miners = await this.database.getMiners();
+          const currentHashrateData = await this.stratumServer.clients ? 
+            Array.from(this.stratumServer.clients.values()).filter(c => c.authorized) : [];
 
-        const leaderboard = await Promise.all(
-          miners.slice(0, limit).map(async (miner) => {
-            const shareStats = await this.database.getMinerShareStats(miner.id);
-            const realtimeClient = currentHashrateData.find(c => c.address === miner.address);
-            
-            return {
-              rank: 0, // Will be set after sorting
-              address: miner.address,
-              workerName: miner.worker_name,
-              hashrate: realtimeClient?.hashrate || miner.hashrate || 0,
-              shares: {
-                total: shareStats.total_shares || 0,
-                valid: shareStats.valid_shares || 0,
-                rejected: shareStats.rejected_shares || 0,
-                efficiency: shareStats.total_shares > 0 ? 
-                  ((shareStats.valid_shares / shareStats.total_shares) * 100).toFixed(2) : 0
-              },
-              blocks: shareStats.blocks_found || 0,
-              lastSeen: miner.last_seen,
-              isOnline: realtimeClient ? true : false,
-              joinedAt: miner.created_at
-            };
-          })
-        );
+          const tempLeaderboard = await Promise.all(
+            miners.slice(0, limit).map(async (miner) => {
+              const shareStats = await this.database.getMinerShareStats(miner.id);
+              const realtimeClient = currentHashrateData.find(c => c.address === miner.address);
+              const avgHashrates = await this.database.calculateMinerAverageHashrates(miner.address);
+              
+              return {
+                rank: 0, // Will be set after sorting
+                address: miner.address,
+                workerName: miner.worker_name,
+                hashrate: realtimeClient?.hashrate || miner.hashrate || 0,
+                avgHashrate1h: avgHashrates.avg_hashrate_1h,
+                avgHashrate3h: avgHashrates.avg_hashrate_3h,
+                avgHashrate24h: avgHashrates.avg_hashrate_24h,
+                shares: {
+                  total: shareStats.total_shares || 0,
+                  valid: shareStats.valid_shares || 0,
+                  rejected: shareStats.rejected_shares || 0,
+                  efficiency: shareStats.total_shares > 0 ? 
+                    ((shareStats.valid_shares / shareStats.total_shares) * 100).toFixed(2) : 0
+                },
+                blocks: shareStats.blocks_found || 0,
+                lastSeen: miner.last_seen,
+                isOnline: realtimeClient ? true : false,
+                joinedAt: miner.created_at
+              };
+            })
+          );
 
-        // Sort by hashrate and assign ranks
-        leaderboard.sort((a, b) => b.hashrate - a.hashrate);
-        leaderboard.forEach((miner, index) => {
-          miner.rank = index + 1;
-        });
+          // Sort by hashrate and assign ranks
+          tempLeaderboard.sort((a, b) => b.hashrate - a.hashrate);
+          tempLeaderboard.forEach((miner, index) => {
+            miner.rank = index + 1;
+          });
+          
+          leaderboard = tempLeaderboard;
+        } else {
+          // Format persistent leaderboard data for response
+          leaderboard = leaderboard.map((miner, index) => ({
+            rank: index + 1,
+            address: miner.address,
+            workerName: `${miner.address.substring(0, 8)}...${miner.address.substring(miner.address.length - 6)}`,
+            hashrate: miner.total_hashrate,
+            avgHashrate1h: miner.avg_hashrate_1h,
+            avgHashrate3h: miner.avg_hashrate_3h,
+            avgHashrate24h: miner.avg_hashrate_24h,
+            shares: {
+              total: miner.total_shares,
+              valid: miner.valid_shares,
+              rejected: miner.rejected_shares,
+              efficiency: miner.total_shares > 0 ? 
+                ((miner.valid_shares / miner.total_shares) * 100).toFixed(2) : 0
+            },
+            blocks: miner.blocks_found,
+            lastSeen: miner.last_active,
+            isOnline: (Date.now() - miner.last_active) < 300000, // 5 minutes threshold
+            joinedAt: miner.first_seen,
+            confirmedBalance: fromAtomicUnits(miner.confirmed_balance || 0),
+            unconfirmedBalance: fromAtomicUnits(miner.unconfirmed_balance || 0),
+            totalPaid: fromAtomicUnits(miner.total_paid || 0)
+          }));
+        }
 
         res.json({
           leaderboard,
           timeRange,
-          totalMiners: miners.length,
+          totalMiners: leaderboard.length,
           onlineMiners: leaderboard.filter(m => m.isOnline).length,
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
+          isPersistent: req.query.fresh !== 'true'
         });
       } catch (error) {
         logger.error(`Error getting leaderboard: ${error.message}`);
@@ -1047,6 +1344,99 @@ class MiningPool {
   }
 
   /**
+   * Get cached network data with 15-second TTL
+   */
+  async getCachedNetworkData() {
+    const now = Date.now();
+    
+    // Return cached data if still valid
+    if (this.networkCache.data && (now - this.networkCache.timestamp) < this.networkCache.ttl) {
+      return this.networkCache.data;
+    }
+
+    try {
+      const template = this.blockTemplateManager.getCurrentTemplate();
+      const daemonConfig = this.config.getDaemonConfig();
+      const daemonStatus = await this.getDaemonStatus(daemonConfig);
+      const totalHashrate = this.stratumServer.calculateTotalHashrate();
+      const totalShareStats = await this.database.getTotalShareStats();
+
+      // 🎯 VELORA-SPECIFIC NETWORK HASHRATE CALCULATION
+      const blockTime = this.config.get('mining.blockTime') || 60;
+      const networkDifficulty = template?.difficulty || 0;
+      const hashratePerDifficulty = 0.24; // H/s per difficulty unit (tuned for Velora)
+      const networkHashrate = networkDifficulty > 0 ? (networkDifficulty * hashratePerDifficulty) : 0;
+      
+      // Calculate pool's share of network hashrate
+      const poolPercentage = networkHashrate > 0 && totalHashrate > 0 ? 
+        ((totalHashrate / networkHashrate) * 100).toFixed(4) : '0.0000';
+      
+      // Pool efficiency from database stats
+      const poolEfficiency = totalShareStats?.total_shares > 0 ? 
+        ((totalShareStats.valid_shares / totalShareStats.total_shares) * 100).toFixed(2) : '0.00';
+
+      // Get additional network info from daemon if available
+      let networkInfo = {};
+      if (daemonStatus.connected) {
+        try {
+          const networkResponse = await axios.get(`${daemonConfig.url}/api/blockchain/status`, {
+            headers: daemonConfig.apiKey ? { 'X-API-Key': daemonConfig.apiKey } : {},
+            timeout: 5000
+          });
+          networkInfo = networkResponse.data;
+        } catch (error) {
+          logger.warn(`Failed to get network info: ${error.message}`);
+        }
+      }
+
+      // Create the network data object
+      const networkData = {
+        daemon: {
+          connected: daemonStatus.connected,
+          url: daemonConfig.url,
+          status: daemonStatus.status,
+          error: daemonStatus.error
+        },
+        blockchain: {
+          height: template?.index || networkInfo.height || 0,
+          difficulty: networkDifficulty,
+          blockTime: blockTime,
+          lastBlock: template?.timestamp || networkInfo.lastBlock || null,
+          pendingTransactions: template?.transactions?.length || 0
+        },
+        pool: {
+          hashrate: totalHashrate,
+          miners: this.stratumServer.getStats().activeConnections,
+          efficiency: parseFloat(poolEfficiency),
+          blocksFound: totalShareStats?.blocks_found || 0,
+          networkHashrate: networkHashrate,
+          poolPercentage: parseFloat(poolPercentage)
+        },
+        network: {
+          hashrate: networkHashrate,
+          difficulty: networkDifficulty,
+          blockTime: blockTime,
+          algorithm: this.config.get('mining.algorithm')
+        },
+        timestamp: new Date().toISOString()
+      };
+
+      // Update cache
+      this.networkCache.data = networkData;
+      this.networkCache.timestamp = now;
+      
+      return networkData;
+    } catch (error) {
+      logger.error(`Error getting cached network data: ${error.message}`);
+      // Return cached data if available, even if expired
+      if (this.networkCache.data) {
+        return this.networkCache.data;
+      }
+      throw error;
+    }
+  }
+
+  /**
    * Start the mining pool
    */
   async start() {
@@ -1059,11 +1449,10 @@ class MiningPool {
 
       // Initialize database
       await this.database.initialize();
-      logger.info('Database initialized successfully');
+      logger.info('Database initialized');
 
       // Clear miners on startup (they are connection-specific, not persistent)
       await this.database.clearMiners();
-      logger.info('Miners cleared from database (startup cleanup)');
 
       // Start HTTP server (guard against double-start and add clear error handling)
       const { port, host } = this.config.getComponentConfig('http');
@@ -1073,7 +1462,7 @@ class MiningPool {
       } else {
         this.server = this.app.listen(port, host, () => {
           this.isRunning = true;
-          logger.info(`HTTP server started on ${host}:${port}`);
+          logger.info(`Web dashboard available at http://${host}:${port}`);
         });
 
         this.server.on('error', (err) => {
@@ -1087,12 +1476,16 @@ class MiningPool {
 
       // Start Stratum server
       this.stratumServer.start();
-      logger.info('Stratum server started successfully');
+      logger.info('Stratum server started');
+      logger.info('Mining pool ready for connections');
 
       // Start statistics updates
       this.startStatisticsUpdates();
 
-      logger.info('Mining pool started successfully');
+      // Start payment processor
+      this.paymentProcessor.start();
+      logger.info('Payment processor started');
+
       return true;
     } catch (error) {
       logger.error(`Failed to start mining pool: ${error.message}`);
@@ -1115,6 +1508,9 @@ class MiningPool {
 
       // Stop Stratum server
       this.stratumServer.stop();
+
+      // Stop payment processor
+      this.paymentProcessor.stop();
 
       // Close database
       await this.database.close();
@@ -1141,6 +1537,42 @@ class MiningPool {
         await this.stratumServer.updateMinerHashratesInDatabase();
       }
     }, 60000); // Update every minute
+
+    // Clean up offline miners every 5 minutes
+    setInterval(async () => {
+      try {
+        await this.database.removeOfflineMiners(10); // Remove miners offline for 10+ minutes
+      } catch (error) {
+        logger.error(`Error cleaning up offline miners: ${error.message}`);
+      }
+    }, 300000); // Clean up every 5 minutes
+
+    // Update leaderboard data in database every 2 minutes
+    setInterval(async () => {
+      try {
+        await this.updateLeaderboardDatabase();
+      } catch (error) {
+        logger.error(`Error updating leaderboard database: ${error.message}`);
+      }
+    }, 120000); // Update every 2 minutes
+
+    // Save miner stats history for persistence every 5 minutes
+    setInterval(async () => {
+      try {
+        await this.saveMinerStatsHistory();
+      } catch (error) {
+        logger.error(`Error saving miner stats history: ${error.message}`);
+      }
+    }, 300000); // Update every 5 minutes
+
+    // Update miner balances (confirm blocks) every 2 minutes
+    setInterval(async () => {
+      try {
+        await this.updateMinerBalances();
+      } catch (error) {
+        logger.error(`Error updating miner balances: ${error.message}`);
+      }
+    }, 120000); // Update every 2 minutes
   }
 
   /**
@@ -1163,6 +1595,230 @@ class MiningPool {
       );
     } catch (error) {
       logger.error(`Error updating statistics: ${error.message}`);
+    }
+  }
+
+  /**
+   * Update leaderboard data in database for persistence
+   */
+  async updateLeaderboardDatabase() {
+    try {
+      const miners = await this.database.getMiners();
+      const currentHashrateData = await this.stratumServer.clients ? 
+        Array.from(this.stratumServer.clients.values()).filter(c => c.authorized) : [];
+
+      for (const miner of miners) {
+        try {
+          const shareStats = await this.database.getMinerShareStats(miner.id);
+          const realtimeClient = currentHashrateData.find(c => c.address === miner.address);
+          const avgHashrates = await this.database.calculateMinerAverageHashrates(miner.address);
+          
+          // Count workers for this address
+          const workersForAddress = miners.filter(m => m.address === miner.address);
+          
+          const leaderboardStats = {
+            worker_count: workersForAddress.length,
+            total_hashrate: realtimeClient?.hashrate || miner.hashrate || 0,
+            avg_hashrate_1h: avgHashrates.avg_hashrate_1h,
+            avg_hashrate_3h: avgHashrates.avg_hashrate_3h,
+            avg_hashrate_24h: avgHashrates.avg_hashrate_24h,
+            total_shares: shareStats.total_shares || 0,
+            valid_shares: shareStats.valid_shares || 0,
+            rejected_shares: shareStats.rejected_shares || 0,
+            blocks_found: shareStats.blocks_found || 0,
+            confirmed_balance: await this.database.calculateConfirmedBalance(miner.address),
+            unconfirmed_balance: await this.database.calculateUnconfirmedBalance(miner.address),
+            total_paid: await this.calculateTotalPaid(miner.address),
+            last_active: realtimeClient ? Date.now() : miner.last_seen
+          };
+
+          await this.database.updateLeaderboard(miner.address, leaderboardStats);
+        } catch (error) {
+          logger.error(`Error updating leaderboard for miner ${miner.address}: ${error.message}`);
+        }
+      }
+
+      logger.debug(`Leaderboard database updated for ${miners.length} miners`);
+    } catch (error) {
+      logger.error(`Error in updateLeaderboardDatabase: ${error.message}`);
+    }
+  }
+
+  /**
+   * Save miner stats history for persistent display
+   */
+  async saveMinerStatsHistory() {
+    try {
+      const miners = await this.database.getMiners();
+      const currentHashrateData = await this.stratumServer.clients ? 
+        Array.from(this.stratumServer.clients.values()).filter(c => c.authorized) : [];
+
+      // Group miners by address to avoid duplicates
+      const minersByAddress = {};
+      for (const miner of miners) {
+        if (!minersByAddress[miner.address]) {
+          minersByAddress[miner.address] = [];
+        }
+        minersByAddress[miner.address].push(miner);
+      }
+
+      for (const [address, addressMiners] of Object.entries(minersByAddress)) {
+        try {
+          const shareStats = await this.database.getMinerShareStats(addressMiners[0].id);
+          const realtimeClients = currentHashrateData.filter(c => c.address === address);
+          
+          const totalHashrate = realtimeClients.reduce((sum, client) => sum + (client.hashrate || 0), 0) ||
+                               addressMiners.reduce((sum, miner) => sum + (miner.hashrate || 0), 0);
+
+          const statsData = {
+            hashrate: totalHashrate,
+            shares_submitted: shareStats.total_shares || 0,
+            shares_accepted: shareStats.valid_shares || 0,
+            shares_rejected: shareStats.rejected_shares || 0,
+            workers_online: realtimeClients.length
+          };
+
+          await this.database.addMinerStatsHistory(address, statsData);
+        } catch (error) {
+          logger.error(`Error saving stats history for miner ${address}: ${error.message}`);
+        }
+      }
+
+      logger.debug(`Miner stats history saved for ${Object.keys(minersByAddress).length} addresses`);
+    } catch (error) {
+      logger.error(`Error in saveMinerStatsHistory: ${error.message}`);
+    }
+  }
+
+  
+  /**
+   * Calculate total amount paid to a miner
+   * This would come from a payouts table in a full implementation
+   */
+  async calculateTotalPaid(address) {
+    try {
+      // Get total paid from leaderboard table (stored in atomic units)
+      const leaderboardData = await this.database.get(
+        'SELECT total_paid FROM leaderboard WHERE address = ?',
+        [address]
+      );
+
+      return leaderboardData ? leaderboardData.total_paid : 0;
+    } catch (error) {
+      logger.error(`Error calculating total paid for ${address}: ${error.message}`);
+      return 0;
+    }
+  }
+
+  /**
+   * Get block confirmation status based on current network height
+   */
+  getBlockStatus(blockHeight) {
+    try {
+      const currentTemplate = this.blockTemplateManager.getCurrentTemplate();
+      if (!currentTemplate || !currentTemplate.index) {
+        return 'pending';
+      }
+      
+      const currentHeight = currentTemplate.index;
+      const confirmationsNeeded = 10; // Standard confirmation requirement
+      const confirmations = currentHeight - blockHeight;
+      
+      if (confirmations >= confirmationsNeeded) {
+        return 'confirmed';
+      } else if (confirmations > 0) {
+        return `confirming (${confirmations}/${confirmationsNeeded})`;
+      } else {
+        return 'pending';
+      }
+    } catch (error) {
+      logger.error(`Error determining block status for height ${blockHeight}: ${error.message}`);
+      return 'pending';
+    }
+  }
+
+  /**
+   * Update miner balances based on confirmed blocks
+   * Move rewards from unconfirmed to confirmed when blocks reach 10 confirmations
+   * This method recalculates balances from scratch to avoid double-confirmation issues
+   */
+  async updateMinerBalances() {
+    try {
+      const currentTemplate = this.blockTemplateManager.getCurrentTemplate();
+      if (!currentTemplate || !currentTemplate.index) {
+        return;
+      }
+      
+      const currentHeight = currentTemplate.index;
+      const confirmationsNeeded = 10;
+
+      // First, update block statuses based on confirmations
+      const unconfirmedBlocks = await this.database.all(`
+        SELECT height, status FROM blocks
+        WHERE status IN ('found', 'pending', 'confirming')
+      `);
+
+      for (const block of unconfirmedBlocks) {
+        const confirmations = currentHeight - block.height;
+        let newStatus = block.status;
+
+        if (confirmations >= confirmationsNeeded) {
+          newStatus = 'confirmed';
+        } else if (confirmations > 0) {
+          newStatus = 'confirming';
+        } else {
+          newStatus = 'pending';
+        }
+
+        if (newStatus !== block.status) {
+          await this.database.updateBlockStatus(block.height, newStatus);
+          logger.debug(`Updated block ${block.height} status: ${block.status} -> ${newStatus} (${confirmations}/${confirmationsNeeded} confirmations)`);
+        }
+      }
+
+      // Get all miners with block rewards
+      const miners = await this.database.all(`
+        SELECT DISTINCT miner_address FROM block_rewards
+      `);
+      
+      const { toAtomicUnits } = require('./utils/atomicUnits.js');
+      
+      for (const miner of miners) {
+        // Get all rewards for this miner
+        const rewards = await this.database.all(`
+          SELECT block_height, miner_reward 
+          FROM block_rewards 
+          WHERE miner_address = ?
+          ORDER BY block_height
+        `, [miner.miner_address]);
+        
+        // Calculate correct confirmed and unconfirmed balances
+        let confirmedBalance = 0;
+        let unconfirmedBalance = 0;
+        
+        for (const reward of rewards) {
+          const confirmations = currentHeight - reward.block_height;
+          if (confirmations >= confirmationsNeeded) {
+            confirmedBalance += reward.miner_reward;
+          } else {
+            unconfirmedBalance += reward.miner_reward;
+          }
+        }
+        
+        // Update the leaderboard with correct balances (atomic units)
+        const confirmedAtomic = toAtomicUnits(confirmedBalance);
+        const unconfirmedAtomic = toAtomicUnits(unconfirmedBalance);
+        
+        await this.database.run(`
+          UPDATE leaderboard 
+          SET confirmed_balance = ?, unconfirmed_balance = ?
+          WHERE address = ?
+        `, [confirmedAtomic, unconfirmedAtomic, miner.miner_address]);
+        
+        logger.debug(`Updated balances for ${miner.miner_address}: ${confirmedBalance} confirmed, ${unconfirmedBalance} unconfirmed`);
+      }
+    } catch (error) {
+      logger.error(`Error updating miner balances: ${error.message}`);
     }
   }
 

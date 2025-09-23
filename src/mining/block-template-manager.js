@@ -6,11 +6,19 @@ class BlockTemplateManager {
     this.config = config;
     this.currentTemplate = null;
     this.lastUpdate = 0;
-    this.updateInterval = 30000; // 30 seconds
+    this.updateInterval = this.config.get('mining.templateUpdateInterval') || 30000; // Default 30 seconds
     this.isUpdating = false;
+    this.newTemplateCallback = null; // Callback for when new templates are available
 
     // Start template updates
     this.startTemplateUpdates();
+  }
+
+  /**
+   * Set callback for new template notifications
+   */
+  setNewTemplateCallback(callback) {
+    this.newTemplateCallback = callback;
   }
 
   /**
@@ -42,9 +50,24 @@ class BlockTemplateManager {
       const template = await this.getRealTemplateFromDaemon(daemonConfig);
 
       if (template) {
+        const isNewHeight = !this.currentTemplate || this.currentTemplate.index !== template.index;
         this.currentTemplate = template;
         this.lastUpdate = Date.now();
-        logger.info(`Template updated successfully - Height: ${template.index}, Difficulty: ${template.difficulty}`);
+        
+        if (isNewHeight) {
+          logger.info(`Template updated successfully - Height: ${template.index}, Difficulty: ${template.difficulty}`);
+          
+          // Notify callback immediately when new template is available
+          if (this.newTemplateCallback) {
+            try {
+              this.newTemplateCallback(template);
+            } catch (error) {
+              logger.error(`Error in new template callback: ${error.message}`);
+            }
+          }
+        } else {
+          logger.debug(`Template refreshed (same height ${template.index})`);
+        }
       }
     } catch (error) {
       logger.error(`Failed to update template: ${error.message}`);
@@ -197,12 +220,26 @@ class BlockTemplateManager {
 
   /**
    * Calculate pool difficulty (automatic adjustment based on share rate)
-   * For now, use a simple fixed low difficulty - automatic adjustment will be added later
+   * Uses configured starting difficulty but caps it to avoid excessive block finding
    */
   calculatePoolDifficulty(blockDifficulty) {
-    // Use a simple fixed difficulty of 1 for now
+    // Use configured starting difficulty instead of hardcoded 1
+    const startingDifficulty = this.config.get('mining.startingDifficulty') || 50000;
+    
+    // For high network difficulty, allow much higher pool difficulty to prevent WAIT spam
+    // The key insight: pool difficulty should be high enough to prevent every share from being a block solution
+    // At minimum, pool difficulty should be 20% of network difficulty to keep block solution chance under 20%
+    const minPoolDifficulty = Math.max(blockDifficulty * 0.2, 1000); // 20% of network difficulty, minimum 1000
+    
+    // Use the higher of configured starting difficulty or calculated minimum
+    // This prevents the WAIT response issue when miners have high hashrates
+    const adjustedDifficulty = Math.max(startingDifficulty, minPoolDifficulty);
+    
+    // Cap at reasonable maximum to avoid making shares too hard to find
+    const maxPoolDifficulty = blockDifficulty * 0.5; // Max 50% of network difficulty  
+    
     // TODO: Implement automatic difficulty adjustment based on share submission rate
-    return 1;
+    return Math.min(adjustedDifficulty, maxPoolDifficulty);
   }
 
   /**
