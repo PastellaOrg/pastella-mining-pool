@@ -9,7 +9,7 @@
     "fee": 0.01,
     "minPayout": 0.001,
     "payoutInterval": 3600000,
-    "feeAddress": "1C9shAVkTSTH2z195Mwp2mrpafbdFrNyvw"
+    "feeAddress": "<pool_payment_address>"
   },
   "http": {
     "port": 3000,
@@ -23,8 +23,8 @@
     "timeout": 30000
   },
   "daemon": {
-    "url": "http://192.168.1.38:22000",
-    "apiKey": "kankerkanker",
+    "url": "http://127.0.0.1:22000",
+    "apiKey": "<daemons_api_key>",
     "username": "",
     "password": "",
     "timeout": 30000,
@@ -63,9 +63,9 @@
     "paymentFee": 100000,
     "paymentInterval": 10000,
     "minPayout": 0.001,
-    "walletName": "pool",
-    "walletPassword": "kevin11",
+    "walletName": "<wallet_name>",
+    "walletPassword": "<wallet_password>",
     "walletApiUrl": "http://localhost:3001",
-    "walletApiKey": "kankerkanker"
+    "walletApiKey": "<wallet_api_key>"
   }
 }
