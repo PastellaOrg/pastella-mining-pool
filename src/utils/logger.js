@@ -2,6 +2,20 @@ const winston = require('winston');
 const path = require('path');
 const fs = require('fs');
 
+// Read config directly to avoid circular dependency
+function getLogLevelFromConfig() {
+  try {
+    const configPath = path.join(__dirname, '../../config/pool.json');
+    if (fs.existsSync(configPath)) {
+      const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+      return config.logging?.level || 'info';
+    }
+  } catch (error) {
+    console.error('Failed to read log level from config:', error.message);
+  }
+  return 'info'; // Default fallback
+}
+
 class Logger {
   constructor() {
     this.setupLogger();
@@ -14,31 +28,34 @@ class Logger {
       fs.mkdirSync(logsDir, { recursive: true });
     }
 
-    // Define log format - completely clean, no timestamps
+    // Define log format with timestamps including milliseconds
     const logFormat = winston.format.combine(
+      winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss.SSS' }),
       winston.format.errors({ stack: true }),
-      winston.format.printf(({ level, message, stack }) => {
+      winston.format.printf(({ level, message, timestamp, stack }) => {
         if (stack) {
-          return `[${level.toUpperCase()}] ${message}\n${stack}`;
+          return `[${timestamp}] [${level.toUpperCase()}] ${message}\n${stack}`;
         }
-        return `[${level.toUpperCase()}] ${message}`;
+        return `[${timestamp}] [${level.toUpperCase()}] ${message}`;
       })
     );
 
     // Create logger instance
+    const configLogLevel = getLogLevelFromConfig();
     this.logger = winston.createLogger({
-      level: process.env.LOG_LEVEL || 'info',
+      level: configLogLevel || 'info', // Environment overrides config if set
       format: logFormat,
       transports: [
-        // Console transport - completely clean
+        // Console transport with timestamps including milliseconds
         new winston.transports.Console({
           format: winston.format.combine(
+            winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss.SSS' }),
             winston.format.colorize(),
-            winston.format.printf(({ level, message, stack }) => {
+            winston.format.printf(({ level, message, timestamp, stack }) => {
               if (stack) {
-                return `[${level}] ${message}\n${stack}`;
+                return `[${timestamp}] [${level}] ${message}\n${stack}`;
               }
-              return `[${level}] ${message}`;
+              return `[${timestamp}] [${level}] ${message}`;
             })
           ),
         }),
