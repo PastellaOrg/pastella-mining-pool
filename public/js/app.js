@@ -691,6 +691,8 @@ class MiningPoolDashboard {
             if (!container) return;
 
             if (data.payments && data.payments.length > 0) {
+                const blockExplorer = data.blockExplorer || 'http://127.0.0.1:3004';
+
                 const paymentsHtml = `
                     <table>
                         <thead>
@@ -703,18 +705,33 @@ class MiningPoolDashboard {
                             </tr>
                         </thead>
                         <tbody>
-                            ${data.payments.map(payment => `
-                                <tr>
-                                    <td style="font-family: monospace; font-size: 0.9rem;">${(payment.address || payment.minerAddress || '').substring(0, 16)}...</td>
-                                    <td>${payment.amount} PAS</td>
-                                    <td style="font-family: monospace; font-size: 0.9rem;">${(payment.txId || payment.transactionId || '').substring(0, 16)}...</td>
-                                    <td>${this.formatTimestamp(payment.timestamp || payment.createdAt)}</td>
-                                    <td>
-                                        <span class="status-indicator ${payment.status === 'confirmed' ? 'status-online' : 'status-offline'}"></span>
-                                        ${payment.status}
-                                    </td>
-                                </tr>
-                            `).join('')}
+                            ${data.payments.map(payment => {
+                                const txId = payment.txId || payment.transactionId || '';
+                                const isFailedTx = payment.status === 'failed';
+
+                                let txIdDisplay;
+                                if (isFailedTx) {
+                                    txIdDisplay = '-';
+                                } else if (txId) {
+                                    const shortTxId = txId.substring(0, 16) + '...';
+                                    txIdDisplay = `<a href="${blockExplorer}/tx/${txId}" target="_blank" style="font-family: 'Courier New', monospace; background: rgba(236, 155, 231, 0.1); padding: 4px 8px; border-radius: 6px; font-size: 0.8rem; color: #ff9ed9; border: 1px solid rgba(236, 155, 231, 0.2); text-decoration: none;">${shortTxId}</a>`;
+                                } else {
+                                    txIdDisplay = '-';
+                                }
+
+                                return `
+                                    <tr>
+                                        <td style="font-family: monospace; font-size: 0.9rem;">${(payment.address || payment.minerAddress || '').substring(0, 16)}...</td>
+                                        <td>${payment.amount} PAS</td>
+                                        <td>${txIdDisplay}</td>
+                                        <td>${this.formatTimestamp(payment.timestamp || payment.createdAt)}</td>
+                                        <td>
+                                            <span class="status-indicator ${payment.status === 'confirmed' ? 'status-online' : 'status-offline'}"></span>
+                                            ${payment.status}
+                                        </td>
+                                    </tr>
+                                `;
+                            }).join('')}
                         </tbody>
                     </table>
                 `;
