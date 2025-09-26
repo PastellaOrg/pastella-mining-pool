@@ -1347,6 +1347,56 @@ class MiningPool {
     }
   }
 
+  async getTransaction(txId) {
+    try {
+      const daemonConfig = this.config.getDaemonConfig();
+      const { url, apiKey, username, password } = daemonConfig;
+
+      if (!url) {
+        throw new Error('Daemon URL not configured');
+      }
+
+      // Prepare headers
+      const headers = {
+        'Content-Type': 'application/json',
+        'User-Agent': 'Pastella-Mining-Pool/1.0.0',
+      };
+
+      if (apiKey) {
+        headers['X-API-Key'] = apiKey;
+      } else if (username && password) {
+        const auth = Buffer.from(`${username}:${password}`).toString('base64');
+        headers['Authorization'] = `Basic ${auth}`;
+      }
+
+      // Try to get transaction from daemon
+      const response = await axios.get(`${url}/api/transaction/${txId}`, {
+        headers,
+        timeout: 10000,
+      });
+
+      if (response.status === 200) {
+        return {
+          txid: response.data.txid || txId,
+          confirmations: response.data.confirmations || 0,
+          blockheight: response.data.blockheight || response.data.block_height,
+          status: response.data.status || 'confirmed',
+          amount: response.data.amount,
+          fee: response.data.fee,
+          timestamp: response.data.timestamp
+        };
+      } else {
+        throw new Error(`Daemon returned status ${response.status}`);
+      }
+    } catch (error) {
+      if (error.response?.status === 404) {
+        throw new Error('Transaction not found');
+      } else {
+        throw error;
+      }
+    }
+  }
+
   /**
    * Get cached network data with 15-second TTL
    */

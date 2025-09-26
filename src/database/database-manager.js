@@ -199,6 +199,16 @@ class DatabaseManager {
         throw error;
       }
     }
+
+    // Migration: Add confirmations column to payments table for transaction validation
+    try {
+      await this.run(`ALTER TABLE payments ADD COLUMN confirmations INTEGER DEFAULT 0`);
+    } catch (error) {
+      // Column already exists, ignore the error
+      if (!error.message.includes('duplicate column name')) {
+        throw error;
+      }
+    }
   }
 
   async run(sql, params = []) {
@@ -994,6 +1004,54 @@ class DatabaseManager {
       total_paid_atomic: stats.total_paid_atomic || 0,
       total_fees_atomic: stats.total_fees_atomic || 0
     };
+  }
+
+  // Transaction validation methods
+  async getPendingPayments() {
+    return this.all(
+      `SELECT * FROM payments WHERE status IN ('pending', 'submitted', 'confirming') ORDER BY created_at DESC`
+    );
+  }
+
+  async updatePaymentConfirmations(transactionId, confirmations) {
+    await this.run(
+      `UPDATE payments SET confirmations = ? WHERE transaction_id = ?`,
+      [confirmations, transactionId]
+    );
+  }
+
+  async restoreFailedPaymentBalance(minerAddress, amountAtomic, transactionId) {
+    // This creates a credit entry by not marking block rewards as paid out
+    // The failed payment amount should be restored to the miner's available balance
+
+    // Find the payment record to understand what rewards were affected
+    const payment = await this.get(
+      `SELECT * FROM payments WHERE transaction_id = ? AND miner_address = ?`,
+      [transactionId, minerAddress]
+    );
+
+    if (payment) {
+      // Restore the block rewards that were marked as paid out for this transaction
+      // by unmarking them as paid (set paid_out back to 0)
+      await this.run(
+        `UPDATE block_rewards
+         SET paid_out = 0
+         WHERE miner_address = ?
+         AND paid_out = 1
+         AND id IN (
+           SELECT br.id FROM block_rewards br
+           JOIN blocks b ON br.block_height = b.height
+           WHERE br.miner_address = ? AND b.status = 'confirmed' AND br.paid_out = 1
+           ORDER BY b.height ASC
+           LIMIT (SELECT COUNT(*) FROM block_rewards br2
+                  JOIN blocks b2 ON br2.block_height = b2.height
+                  WHERE br2.miner_address = ? AND b2.status = 'confirmed' AND br2.paid_out = 1)
+         )`,
+        [minerAddress, minerAddress, minerAddress]
+      );
+
+      logger.info(`Restored failed payment balance for ${minerAddress}: ${fromAtomicUnits(amountAtomic)} PAS`);
+    }
   }
 
   async close() {

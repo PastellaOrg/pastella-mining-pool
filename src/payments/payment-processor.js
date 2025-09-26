@@ -33,6 +33,7 @@ class PaymentProcessor {
     });
 
     this.paymentInterval = null;
+    this.validationInterval = null;
     this.isProcessing = false;
 
     logger.info(`Payment processor initialized - Interval: ${this.paymentConfig.interval}ms, Min payout: ${this.paymentConfig.minPayout} PAS`);
@@ -60,6 +61,13 @@ class PaymentProcessor {
     this.paymentInterval = setInterval(() => {
       this.processPayments();
     }, this.paymentConfig.interval);
+
+    // Start transaction validation if enabled
+    if (this.config.get('payout.transactionValidation')) {
+      this.startTransactionValidation();
+    } else {
+      logger.info('Transaction validation is disabled in configuration');
+    }
   }
 
   stop() {
@@ -68,6 +76,9 @@ class PaymentProcessor {
       this.paymentInterval = null;
       logger.info('Payment processor stopped');
     }
+
+    // Stop transaction validation
+    this.stopTransactionValidation();
   }
 
   async processPayments() {
@@ -265,6 +276,167 @@ class PaymentProcessor {
 
   async getPaymentHistory(minerAddress = null, limit = 50, offset = 0) {
     return await this.database.getPaymentHistory(minerAddress, limit, offset);
+  }
+
+  /**
+   * Check transaction status and update payment records
+   */
+  async validatePendingTransactions() {
+    try {
+      logger.debug('Starting transaction validation cycle');
+
+      // Get all pending/submitted transactions
+      const pendingPayments = await this.database.getPendingPayments();
+
+      if (!pendingPayments || pendingPayments.length === 0) {
+        logger.debug('No pending payments to validate');
+        return;
+      }
+
+      logger.info(`Validating ${pendingPayments.length} pending transactions`);
+
+      for (const payment of pendingPayments) {
+        try {
+          await this.validateTransaction(payment);
+        } catch (error) {
+          logger.error(`Failed to validate transaction ${payment.transaction_id}: ${error.message}`);
+        }
+      }
+
+      logger.debug('Transaction validation cycle completed');
+    } catch (error) {
+      logger.error(`Transaction validation failed: ${error.message}`);
+    }
+  }
+
+  /**
+   * Validate individual transaction
+   */
+  async validateTransaction(payment) {
+    const txId = payment.transaction_id;
+
+    try {
+      // First try to get transaction from wallet API
+      let txInfo = null;
+      let isInNetwork = false;
+
+      try {
+        const walletResponse = await this.walletAPI.get(`/api/wallet/transaction/${txId}`);
+        txInfo = walletResponse.data;
+        isInNetwork = true;
+        logger.debug(`Transaction ${txId} found in wallet: ${JSON.stringify(txInfo)}`);
+      } catch (walletError) {
+        if (walletError.response?.status === 404) {
+          logger.debug(`Transaction ${txId} not found in wallet`);
+        } else {
+          logger.warn(`Wallet API error checking ${txId}: ${walletError.message}`);
+        }
+      }
+
+      // If not in wallet, try daemon/blockchain API
+      if (!isInNetwork && this.pool.daemon) {
+        try {
+          const daemonResponse = await this.pool.daemon.getTransaction(txId);
+          if (daemonResponse) {
+            txInfo = daemonResponse;
+            isInNetwork = true;
+            logger.debug(`Transaction ${txId} found in blockchain: ${JSON.stringify(txInfo)}`);
+          }
+        } catch (daemonError) {
+          logger.debug(`Transaction ${txId} not found in blockchain: ${daemonError.message}`);
+        }
+      }
+
+      // Update transaction status based on findings
+      if (!isInNetwork) {
+        // Transaction not found anywhere - mark as failed
+        logger.warn(`Transaction ${txId} not found in network or mempool - marking as failed`);
+        await this.database.updatePaymentStatus(txId, 'failed', 'Transaction not found in network');
+
+        // Restore miner balance since payment failed
+        await this.restorePaymentBalance(payment);
+      } else {
+        // Transaction found - check confirmations
+        const confirmations = txInfo.confirmations || 0;
+        const minConfirmations = this.config.get('payout.minConfirmations') || 10;
+
+        if (confirmations >= minConfirmations) {
+          // Transaction confirmed
+          logger.info(`Transaction ${txId} confirmed with ${confirmations} confirmations`);
+          await this.database.updatePaymentStatus(txId, 'confirmed');
+          await this.database.updatePaymentConfirmations(txId, confirmations);
+        } else if (confirmations > 0) {
+          // Transaction in blockchain but not fully confirmed
+          logger.debug(`Transaction ${txId} has ${confirmations}/${minConfirmations} confirmations`);
+          await this.database.updatePaymentStatus(txId, 'confirming');
+          await this.database.updatePaymentConfirmations(txId, confirmations);
+        } else {
+          // Transaction in mempool
+          logger.debug(`Transaction ${txId} in mempool (0 confirmations)`);
+          await this.database.updatePaymentStatus(txId, 'pending');
+        }
+      }
+
+    } catch (error) {
+      logger.error(`Error validating transaction ${txId}: ${error.message}`);
+      throw error;
+    }
+  }
+
+  /**
+   * Restore miner balance when payment fails
+   */
+  async restorePaymentBalance(payment) {
+    try {
+      logger.info(`Restoring balance for failed payment to ${payment.miner_address}: ${fromAtomicUnits(payment.amount_atomic)} PAS`);
+
+      // Add the amount back to miner's balance by creating a credit entry
+      await this.database.restoreFailedPaymentBalance(
+        payment.miner_address,
+        payment.amount_atomic,
+        payment.transaction_id
+      );
+
+      logger.info(`Balance restored for ${payment.miner_address}`);
+    } catch (error) {
+      logger.error(`Failed to restore balance for ${payment.miner_address}: ${error.message}`);
+      throw error;
+    }
+  }
+
+  /**
+   * Start transaction validation interval
+   */
+  startTransactionValidation() {
+    if (this.validationInterval) {
+      logger.warn('Transaction validation is already running');
+      return;
+    }
+
+    // Validate transactions every 2 minutes
+    const validationIntervalMs = 120000;
+    logger.info(`Starting transaction validation - checking every ${validationIntervalMs / 1000} seconds`);
+
+    // Run first validation after 1 minute
+    setTimeout(() => {
+      this.validatePendingTransactions();
+    }, 60000);
+
+    // Set up recurring validation
+    this.validationInterval = setInterval(() => {
+      this.validatePendingTransactions();
+    }, validationIntervalMs);
+  }
+
+  /**
+   * Stop transaction validation
+   */
+  stopTransactionValidation() {
+    if (this.validationInterval) {
+      clearInterval(this.validationInterval);
+      this.validationInterval = null;
+      logger.info('Transaction validation stopped');
+    }
   }
 }
 

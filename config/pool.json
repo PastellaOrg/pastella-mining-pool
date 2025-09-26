@@ -45,7 +45,7 @@
     "backupInterval": 86400000
   },
   "logging": {
-    "level": "debug",
+    "level": "info",
     "file": "./logs/pool.log",
     "maxSize": "10m",
     "maxFiles": 5
@@ -59,6 +59,7 @@
   },
   "payout": {
     "enabled": true,
+    "transactionValidation": false,
     "minConfirmations": 10,
     "batchSize": 50,
     "paymentFee": 100000,
