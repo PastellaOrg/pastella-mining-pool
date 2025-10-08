@@ -1,5 +1,7 @@
 const MiningPool = require('./pool.js');
 const logger = require('./utils/logger.js');
+const { validateWalletAddress } = require('./utils/address-validator.js');
+const ConfigManager = require('./config/config-manager.js');
 
 // Handle graceful shutdown
 process.on('SIGINT', () => {
@@ -86,6 +88,29 @@ let pool = null;
 async function startPool() {
   try {
     logger.info('Starting Pastella Mining Pool...');
+
+    // Validate pool address before starting
+    const config = new ConfigManager();
+    const poolAddress = config.get('pool.poolAddress');
+
+    if (!poolAddress) {
+      logger.error('POOL STARTUP FAILED: Pool address is not configured');
+      logger.error('   Please set "poolAddress" in config/pool.json');
+      logger.error('   Example: "poolAddress": "1YourValidP2PKHAddress..."');
+      process.exit(1);
+    }
+
+    const validation = validateWalletAddress(poolAddress);
+    if (!validation.valid) {
+      logger.error('POOL STARTUP FAILED: Invalid pool address configuration');
+      logger.error(`   Pool Address: ${poolAddress}`);
+      logger.error(`   Error: ${validation.message}`);
+      logger.error('   Please update "poolAddress" in config/pool.json with a valid P2PKH address');
+      logger.error('   Valid P2PKH addresses start with "1" and are 26-35 characters long');
+      process.exit(1);
+    }
+
+    logger.info(`Pool address validated: ${poolAddress}`);
 
     pool = new MiningPool();
     const success = await pool.start();

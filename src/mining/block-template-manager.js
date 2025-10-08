@@ -119,7 +119,7 @@ class BlockTemplateManager {
         headers,
         timeout: daemonConfig.timeout || 30000,
         params: {
-          address: this.config.get('pool.feeAddress') || 'pool-fee-address',
+          address: this.config.get('pool.poolAddress') || 'pool-fee-address',
         },
       });
 
