@@ -9,7 +9,7 @@
     "fee": 0.01,
     "minPayout": 0.001,
     "payoutInterval": 3600000,
-    "feeAddress": "<pool_payment_address>",
+    "poolAddress": "<pool_payment_address>",
     "blockExplorer": "http://127.0.0.1:3004"
   },
   "http": {
