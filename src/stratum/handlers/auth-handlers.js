@@ -1,4 +1,5 @@
 const logger = require('../../utils/logger.js');
+const { validateWalletAddress } = require('../../utils/address-validator.js');
 
 class AuthHandlers {
   constructor(server) {
@@ -49,7 +50,15 @@ class AuthHandlers {
       walletAddress = workerName;
       actualWorkerName = 'default';
     }
-    
+
+    // Validate wallet address format
+    const validation = validateWalletAddress(walletAddress);
+    if (!validation.valid) {
+      logger.warn(`Invalid wallet address from client ${clientId}: ${walletAddress} - ${validation.message}`);
+      this.server.sendError(clientId, id, 24, `Invalid wallet address: ${validation.message}`);
+      return;
+    }
+
     // Normalize worker name to prevent duplicates - use consistent default name
     if (!actualWorkerName || actualWorkerName === 'default') {
       actualWorkerName = 'miner';
@@ -118,7 +127,15 @@ class AuthHandlers {
       walletAddress = workerName;
       actualWorkerName = 'default';
     }
-    
+
+    // Validate wallet address format
+    const validation = validateWalletAddress(walletAddress);
+    if (!validation.valid) {
+      logger.warn(`Invalid wallet address from client ${clientId}: ${walletAddress} - ${validation.message}`);
+      this.server.sendError(clientId, id, 24, `Invalid wallet address: ${validation.message}`);
+      return;
+    }
+
     // Normalize worker name to prevent duplicates - use consistent default name
     if (!actualWorkerName || actualWorkerName === 'default') {
       actualWorkerName = 'miner';
