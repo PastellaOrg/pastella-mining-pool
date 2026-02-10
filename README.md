@@ -1,0 +1,1 @@
+# pastella-mining-pool
