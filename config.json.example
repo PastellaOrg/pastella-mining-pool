@@ -1,0 +1,228 @@
+{
+	"poolHost": "<POOL_MINING_ADDRESS>",
+	"coin": "Pastella",
+	"symbol": "PAS",
+	"coinUnits": 100000000,
+	"coinDecimalPlaces": 8,
+	"coinDifficultyTarget": 30,
+	"blockchainExplorer": "https://explorer.pastella.org/block/{id}",
+	"transactionExplorer": "https://explorer.pastella.org/transaction/{id}",
+	"daemonType": "bytecoin",
+	"cnAlgorithm": "randomx",
+	"cnVariant": 0,
+	"cnBlobType": 0,
+	"offset": 2,
+	"isRandomX": true,
+	"logging": {
+		"files": {
+			"level": "info",
+			"directory": "logs",
+			"flushInterval": 5
+		},
+		"console": {
+			"level": "info",
+			"colors": true
+		}
+	},
+	"hashingUtil": false,
+	"poolServer": {
+		"enabled": true,
+		"clusterForks": "auto",
+		"poolAddress": "<YOUR_WALLET_ADDRESS>",
+		"addressPrefix": "PAS",
+		"addressLength": 54,
+		"blockRefreshInterval": 600,
+		"minerTimeout": 600,
+		"sslCert": "<SSL_CERT>",
+		"sslKey": "<SSL_KEY>",
+		"sslCA": "<SSL_CA>",
+		"ports": [
+			{
+				"port": 3333,
+				"difficulty": 5000,
+				"desc": "Low end"
+			},
+			{
+				"port": 5555,
+				"difficulty": 15000,
+				"desc": "Mid range"
+			},
+			{
+				"port": 7777,
+				"difficulty": 25000,
+				"desc": "High end"
+			},
+			{
+				"port": 9999,
+				"difficulty": 500000,
+				"desc": "Super high end"
+			}
+		],
+		"varDiff": {
+			"minDiff": 100,
+			"maxDiff": 100000000,
+			"targetTime": 30,
+			"retargetTime": 15,
+			"variancePercent": 30,
+			"maxJump": 50
+		},
+		"fixedDiff": {
+			"enabled": true,
+			"addressSeparator": "."
+		},
+		"shareTrust": {
+			"enabled": true,
+			"min": 10,
+			"stepDown": 3,
+			"threshold": 10,
+			"penalty": 30
+		},
+		"banning": {
+			"enabled": false,
+			"time": 120,
+			"invalidPercent": 80,
+			"checkThreshold": 30
+		},
+		"slushMining": {
+			"enabled": false,
+			"weight": 300,
+			"blockTime": 30,
+			"lastBlockCheckRate": 1
+		}
+	},
+	"payments": {
+		"enabled": true,
+		"interval": 300,
+		"maxAddresses": 15,
+		"mixin": 0,
+		"priority": 0,
+		"transferFee": 1000,
+		"dynamicTransferFee": true,
+		"minerPayFee": true,
+		"minPayment": 100000,
+		"maxTransactionAmount": 10000000000,
+		"denomination": 1
+	},
+	"blockUnlocker": {
+		"enabled": true,
+		"interval": 10,
+		"depth": 10,
+		"poolFee": 1,
+		"devDonation": 0,
+		"networkFee": 0,
+		"finderReward": 1,
+		"fixBlockHeightRPC": false,
+		"useFirstVout": false
+	},
+	"api": {
+		"enabled": true,
+		"hashrateWindow": 600,
+		"updateInterval": 2,
+		"bindIp": "0.0.0.0",
+		"port": 8117,
+		"blocks": 30,
+		"payments": 30,
+		"password": "<ADMIN_PASSWORD>",
+		"ssl": false,
+		"sslPort": 8118,
+		"sslCert": "<SSL_CERT>",
+		"sslKey": "<SSL_KEY>",
+		"sslCA": "<SSL_CA>",
+		"trustProxyIP": true
+	},
+	"daemon": {
+		"host": "127.0.0.1",
+		"port": 21001
+	},
+	"walletApi": {
+		"host": "127.0.0.1",
+		"port": 21002,
+		"apiKey": "<WALLET_API_KEY>",
+		"timeout": 30000,
+		"walletFile": "pool.wallet",
+		"walletPassword": "<WALLET_PASSWORD>"
+	},
+	"redis": {
+		"host": "127.0.0.1",
+		"port": 6379,
+		"auth": null,
+		"db": 0,
+		"cleanupInterval": 15
+	},
+	"monitoring": {
+		"daemon": {
+			"checkInterval": 60,
+			"rpcMethod": "getblockcount",
+			"enabled": true
+		},
+		"wallet": {
+			"checkInterval": 60,
+			"enabled": true
+		}
+	},
+	"prices": {
+		"source": "tradeogre",
+		"currency": "USD"
+	},
+	"charts": {
+		"pool": {
+			"hashrate": {
+				"enabled": true,
+				"updateInterval": 60,
+				"stepInterval": 1800,
+				"maximumPeriod": 86400
+			},
+			"miners": {
+				"enabled": true,
+				"updateInterval": 60,
+				"stepInterval": 1800,
+				"maximumPeriod": 86400
+			},
+			"workers": {
+				"enabled": true,
+				"updateInterval": 60,
+				"stepInterval": 1800,
+				"maximumPeriod": 86400
+			},
+			"difficulty": {
+				"enabled": true,
+				"updateInterval": 1800,
+				"stepInterval": 10800,
+				"maximumPeriod": 604800
+			},
+			"price": {
+				"enabled": true,
+				"updateInterval": 1800,
+				"stepInterval": 10800,
+				"maximumPeriod": 604800
+			},
+			"profit": {
+				"enabled": true,
+				"updateInterval": 1800,
+				"stepInterval": 10800,
+				"maximumPeriod": 604800
+			}
+		},
+		"user": {
+			"hashrate": {
+				"enabled": true,
+				"updateInterval": 180,
+				"stepInterval": 1800,
+				"maximumPeriod": 86400
+			},
+			"worker_hashrate": {
+				"enabled": true,
+				"updateInterval": 60,
+				"stepInterval": 60,
+				"maximumPeriod": 86400
+			},
+			"payments": {
+				"enabled": true
+			}
+		},
+		"blocks": {
+			"enabled": true,
+			"days": 30
+		}
+	}
+}

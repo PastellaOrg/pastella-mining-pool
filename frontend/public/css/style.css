@@ -1,0 +1,1096 @@
+@font-face {
+  font-family: 'XKR';
+  font-style: normal;
+  font-weight: 400;
+  src: url('/fonts/icomoon.eot');
+  /* IE9 Compat Modes */
+  src: local('Icomoon'), local('icomoon'),
+    url('../fonts/icomoon.eot?#iefix') format('embedded-opentype'),
+    /* IE6-IE8 */
+    url('../fonts/icomoon.woff') format('woff'),
+    /* Modern Browsers */
+    url('../fonts/icomoon.ttf') format('truetype'),
+    /* Safari, Android, iOS */
+    url('../fonts/icomoon.svg#MajorMonoDisplay') format('svg');
+  /* Legacy iOS */
+}
+
+/* roboto-mono-regular - latin */
+@font-face {
+  font-family: 'Roboto Mono';
+  font-style: normal;
+  font-weight: 400;
+  src: url('../fonts/roboto-mono-v22-latin-regular.eot'); /* IE9 Compat Modes */
+  src: local(''),
+       url('../fonts/roboto-mono-v22-latin-regular.eot?#iefix') format('embedded-opentype'), /* IE6-IE8 */
+       url('../fonts/roboto-mono-v22-latin-regular.woff2') format('woff2'), /* Super Modern Browsers */
+       url('../fonts/roboto-mono-v22-latin-regular.woff') format('woff'), /* Modern Browsers */
+       url('../fonts/roboto-mono-v22-latin-regular.ttf') format('truetype'), /* Safari, Android, iOS */
+       url('../fonts/roboto-mono-v22-latin-regular.svg#RobotoMono') format('svg'); /* Legacy iOS */
+}
+
+/* roboto-mono-600 - latin */
+@font-face {
+  font-family: 'Roboto Mono';
+  font-style: normal;
+  font-weight: 600;
+  src: url('../fonts/roboto-mono-v22-latin-600.eot'); /* IE9 Compat Modes */
+  src: local(''),
+       url('../fonts/roboto-mono-v22-latin-600.eot?#iefix') format('embedded-opentype'), /* IE6-IE8 */
+       url('../fonts/roboto-mono-v22-latin-600.woff2') format('woff2'), /* Super Modern Browsers */
+       url('../fonts/roboto-mono-v22-latin-600.woff') format('woff'), /* Modern Browsers */
+       url('../fonts/roboto-mono-v22-latin-600.ttf') format('truetype'), /* Safari, Android, iOS */
+       url('../fonts/roboto-mono-v22-latin-600.svg#RobotoMono') format('svg'); /* Legacy iOS */
+}
+
+
+/* montserrat-100 - latin */
+@font-face {
+  font-family: 'Montserrat';
+  font-style: normal;
+  font-weight: 100;
+  src: local(''),
+    url('../fonts/montserrat-v15-latin-100.woff2') format('woff2'),
+    /* Chrome 26+, Opera 23+, Firefox 39+ */
+    url('../fonts/montserrat-v15-latin-100.woff') format('woff');
+  /* Chrome 6+, Firefox 3.6+, IE 9+, Safari 5.1+ */
+}
+
+/* montserrat-100italic - latin */
+@font-face {
+  font-family: 'Montserrat';
+  font-style: italic;
+  font-weight: 100;
+  src: local(''),
+    url('../fonts/montserrat-v15-latin-100italic.woff2') format('woff2'),
+    /* Chrome 26+, Opera 23+, Firefox 39+ */
+    url('../fonts/montserrat-v15-latin-100italic.woff') format('woff');
+  /* Chrome 6+, Firefox 3.6+, IE 9+, Safari 5.1+ */
+}
+
+/* montserrat-200 - latin */
+@font-face {
+  font-family: 'Montserrat';
+  font-style: normal;
+  font-weight: 200;
+  src: local(''),
+    url('../fonts/montserrat-v15-latin-200.woff2') format('woff2'),
+    /* Chrome 26+, Opera 23+, Firefox 39+ */
+    url('../fonts/montserrat-v15-latin-200.woff') format('woff');
+  /* Chrome 6+, Firefox 3.6+, IE 9+, Safari 5.1+ */
+}
+
+/* montserrat-200italic - latin */
+@font-face {
+  font-family: 'Montserrat';
+  font-style: italic;
+  font-weight: 200;
+  src: local(''),
+    url('../fonts/montserrat-v15-latin-200italic.woff2') format('woff2'),
+    /* Chrome 26+, Opera 23+, Firefox 39+ */
+    url('../fonts/montserrat-v15-latin-200italic.woff') format('woff');
+  /* Chrome 6+, Firefox 3.6+, IE 9+, Safari 5.1+ */
+}
+
+/* montserrat-300 - latin */
+@font-face {
+  font-family: 'Montserrat';
+  font-style: normal;
+  font-weight: 300;
+  src: local(''),
+    url('../fonts/montserrat-v15-latin-300.woff2') format('woff2'),
+    /* Chrome 26+, Opera 23+, Firefox 39+ */
+    url('../fonts/montserrat-v15-latin-300.woff') format('woff');
+  /* Chrome 6+, Firefox 3.6+, IE 9+, Safari 5.1+ */
+}
+
+/* montserrat-300italic - latin */
+@font-face {
+  font-family: 'Montserrat';
+  font-style: italic;
+  font-weight: 300;
+  src: local(''),
+    url('../fonts/montserrat-v15-latin-300italic.woff2') format('woff2'),
+    /* Chrome 26+, Opera 23+, Firefox 39+ */
+    url('../fonts/montserrat-v15-latin-300italic.woff') format('woff');
+  /* Chrome 6+, Firefox 3.6+, IE 9+, Safari 5.1+ */
+}
+
+/* montserrat-regular - latin */
+@font-face {
+  font-family: 'Montserrat';
+  font-style: normal;
+  font-weight: 400;
+  src: local(''),
+    url('../fonts/montserrat-v15-latin-regular.woff2') format('woff2'),
+    /* Chrome 26+, Opera 23+, Firefox 39+ */
+    url('../fonts/montserrat-v15-latin-regular.woff') format('woff');
+  /* Chrome 6+, Firefox 3.6+, IE 9+, Safari 5.1+ */
+}
+
+/* montserrat-italic - latin */
+@font-face {
+  font-family: 'Montserrat';
+  font-style: italic;
+  font-weight: 400;
+  src: local(''),
+    url('../fonts/montserrat-v15-latin-italic.woff2') format('woff2'),
+    /* Chrome 26+, Opera 23+, Firefox 39+ */
+    url('../fonts/montserrat-v15-latin-italic.woff') format('woff');
+  /* Chrome 6+, Firefox 3.6+, IE 9+, Safari 5.1+ */
+}
+
+/* montserrat-500 - latin */
+@font-face {
+  font-family: 'Montserrat';
+  font-style: normal;
+  font-weight: 500;
+  src: local(''),
+    url('../fonts/montserrat-v15-latin-500.woff2') format('woff2'),
+    /* Chrome 26+, Opera 23+, Firefox 39+ */
+    url('../fonts/montserrat-v15-latin-500.woff') format('woff');
+  /* Chrome 6+, Firefox 3.6+, IE 9+, Safari 5.1+ */
+}
+
+/* montserrat-500italic - latin */
+@font-face {
+  font-family: 'Montserrat';
+  font-style: italic;
+  font-weight: 500;
+  src: local(''),
+    url('../fonts/montserrat-v15-latin-500italic.woff2') format('woff2'),
+    /* Chrome 26+, Opera 23+, Firefox 39+ */
+    url('../fonts/montserrat-v15-latin-500italic.woff') format('woff');
+  /* Chrome 6+, Firefox 3.6+, IE 9+, Safari 5.1+ */
+}
+
+/* montserrat-600 - latin */
+@font-face {
+  font-family: 'Montserrat';
+  font-style: normal;
+  font-weight: 600;
+  src: local(''),
+    url('../fonts/montserrat-v15-latin-600.woff2') format('woff2'),
+    /* Chrome 26+, Opera 23+, Firefox 39+ */
+    url('../fonts/montserrat-v15-latin-600.woff') format('woff');
+  /* Chrome 6+, Firefox 3.6+, IE 9+, Safari 5.1+ */
+}
+
+/* montserrat-600italic - latin */
+@font-face {
+  font-family: 'Montserrat';
+  font-style: italic;
+  font-weight: 600;
+  src: local(''),
+    url('../fonts/montserrat-v15-latin-600italic.woff2') format('woff2'),
+    /* Chrome 26+, Opera 23+, Firefox 39+ */
+    url('../fonts/montserrat-v15-latin-600italic.woff') format('woff');
+  /* Chrome 6+, Firefox 3.6+, IE 9+, Safari 5.1+ */
+}
+
+/* montserrat-700 - latin */
+@font-face {
+  font-family: 'Montserrat';
+  font-style: normal;
+  font-weight: 700;
+  src: local(''),
+    url('../fonts/montserrat-v15-latin-700.woff2') format('woff2'),
+    /* Chrome 26+, Opera 23+, Firefox 39+ */
+    url('../fonts/montserrat-v15-latin-700.woff') format('woff');
+  /* Chrome 6+, Firefox 3.6+, IE 9+, Safari 5.1+ */
+}
+
+/* montserrat-700italic - latin */
+@font-face {
+  font-family: 'Montserrat';
+  font-style: italic;
+  font-weight: 700;
+  src: local(''),
+    url('../fonts/montserrat-v15-latin-700italic.woff2') format('woff2'),
+    /* Chrome 26+, Opera 23+, Firefox 39+ */
+    url('../fonts/montserrat-v15-latin-700italic.woff') format('woff');
+  /* Chrome 6+, Firefox 3.6+, IE 9+, Safari 5.1+ */
+}
+
+/* montserrat-800 - latin */
+@font-face {
+  font-family: 'Montserrat';
+  font-style: normal;
+  font-weight: 800;
+  src: local(''),
+    url('../fonts/montserrat-v15-latin-800.woff2') format('woff2'),
+    /* Chrome 26+, Opera 23+, Firefox 39+ */
+    url('../fonts/montserrat-v15-latin-800.woff') format('woff');
+  /* Chrome 6+, Firefox 3.6+, IE 9+, Safari 5.1+ */
+}
+
+/* montserrat-800italic - latin */
+@font-face {
+  font-family: 'Montserrat';
+  font-style: italic;
+  font-weight: 800;
+  src: local(''),
+    url('../fonts/montserrat-v15-latin-800italic.woff2') format('woff2'),
+    /* Chrome 26+, Opera 23+, Firefox 39+ */
+    url('../fonts/montserrat-v15-latin-800italic.woff') format('woff');
+  /* Chrome 6+, Firefox 3.6+, IE 9+, Safari 5.1+ */
+}
+
+/* montserrat-900 - latin */
+@font-face {
+  font-family: 'Montserrat';
+  font-style: normal;
+  font-weight: 900;
+  src: local(''),
+    url('../fonts/montserrat-v15-latin-900.woff2') format('woff2'),
+    /* Chrome 26+, Opera 23+, Firefox 39+ */
+    url('../fonts/montserrat-v15-latin-900.woff') format('woff');
+  /* Chrome 6+, Firefox 3.6+, IE 9+, Safari 5.1+ */
+}
+
+/* montserrat-900italic - latin */
+@font-face {
+  font-family: 'Montserrat';
+  font-style: italic;
+  font-weight: 900;
+  src: local(''),
+    url('../fonts/montserrat-v15-latin-900italic.woff2') format('woff2'),
+    /* Chrome 26+, Opera 23+, Firefox 39+ */
+    url('../fonts/montserrat-v15-latin-900italic.woff') format('woff');
+  /* Chrome 6+, Firefox 3.6+, IE 9+, Safari 5.1+ */
+}
+
+
+body {
+  background-color: #1E1D1F;
+  padding-top: 0;
+  padding-bottom: 4rem;
+  color: rgba(255, 255, 255, 0.5);
+  font-family: 'Roboto Mono';
+  margin: 0;
+  min-height: 100vh;
+  width: 100%;
+}
+
+#root {
+  width: 100%;
+}
+
+main {
+  width: 100%;
+}
+
+body {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+a {
+  color: #FF8AFB;
+}
+
+.bg-dark {
+  background-color: #1A191B !important;
+}
+
+.menu-item-fa {
+  font-size: 21px;
+}
+
+.nav-item-space {
+  padding-right: 5px;
+}
+
+.container {
+  color: #f1f2f3;
+  max-width: 1200px;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: 15px;
+  padding-right: 15px;
+}
+
+.card-dark {
+  background-color: #282729;
+  border-color: #282729;
+}
+
+.card-header-dark {
+  background-color: #222123;
+  color: #ffffff;
+}
+
+.card-header {
+  font-family: 'Montserrat';
+  font-weight: 700;
+}
+
+.card-chart {
+  padding: 0px;
+}
+
+.badge {
+  font-family: 'Roboto Mono'
+}
+
+.table-responsive,
+.table {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.table>thead {
+  color: #f1f2f3;
+  font-family: "Montserrat";
+}
+
+.link-white {
+  color: rgba(255, 255, 255, 0.7);
+  text-decoration: none;
+}
+
+.link-white:hover {
+  color: #cfcfcf;
+  text-decoration: underline;
+}
+
+.blocks-wrapper {
+  width: 100%;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+.block-border {
+  /* background: linear-gradient(130deg, #5f86f2, #a65ff2, #f25fd0, #f25f61, #f2cb5f, #abf25f, #5ff281, #5ff2f0); */
+  background: rgba(255, 255, 255, 0.1);
+  animation: gradient 30s ease infinite;
+  background-size: 1000% 1000% !important;
+  width: 125px;
+  height: 125px;
+  padding: 5px 6px;
+  border-radius: 10px;
+  display: inline-block;
+}
+
+.scrollStyle {
+  max-height: 310px;
+}
+
+/*
+body > main > div.row > center > div > div:nth-child(7) {
+  animation-delay: 4s;
+}
+
+body > main > div.row > center > div > div:nth-child(8) {
+  animation-delay: 5s;
+}
+body > main > div.row > center > div > div:nth-child(9) {
+  animation-delay: 6s;
+}
+body > main > div.row > center > div > div:nth-child(10) {
+  animation-delay: 7s;
+} */
+
+
+body>main>div.row>center>div>div:nth-child(6) {}
+
+@keyframes gradient {
+  0% {
+    background-position: 0% 50%;
+  }
+
+  50% {
+    background-position: 100% 50%;
+  }
+
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+.block-border-light {
+  background: linear-gradient(130deg, rgba(95, 134, 242, 0.50), rgba(166, 95, 242, 0.40), rgba(242, 95, 208, 0.40), rgba(242, 95, 97, 0.40), rgba(242, 203, 95, 0.40), rgba(171, 242, 95, 0.40), rgba(95, 242, 129, 0.40), rgba(95, 242, 240, 0.40));
+  background-size: 1000% 1000% !important;
+  animation: gradient 15s ease infinite;
+  width: 125px;
+  height: 125px;
+  padding: 5px 6px;
+  border-radius: 10px;
+  display: inline-block;
+}
+
+.block-border-light:nth-child(1) {
+  animation-delay: 3s;
+}
+
+.block-border-light:nth-child(2) {
+  animation-delay: 2s;
+}
+
+.block-border-light:nth-child(3) {
+  animation-delay: 1s;
+}
+
+.block-margin-left {
+  margin-left: 20px;
+}
+
+.block-margin-right {
+  margin-right: 20px;
+}
+
+.block {
+  padding: 5px;
+  border-radius: 5px;
+  height: 100%;
+  background-color: #1E1D1F;
+  position: relative;
+  font-size: 11px;
+}
+
+.block-click:hover {
+  cursor: pointer;
+}
+
+.gradient {
+  padding: 30px;
+  width: 250px;
+  float: left;
+  border: 1.5px solid;
+  border-top: 0;
+  border-bottom: 0;
+  border-image: linear-gradient(to bottom, rgba(255, 255, 255, 0) 0%, rgba(226, 226, 226, 1) 48%, rgba(255, 255, 255, 0) 100%);
+  border-image-slice: 1;
+}
+
+tr {
+  border-bottom: 0;
+}
+
+.table>:not(caption)>*>* {
+  border-bottom-width: 0 !important;
+}
+
+.vertical-spacing {
+  height: 100%;
+  width: 2px;
+  display: inline-block;
+  margin-right: 20px;
+  margin-left: 20px;
+  background: -webkit-linear-gradient(top, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0) 10%, rgba(255, 255, 255, 0.65) 50%, rgba(255, 255, 255, 0) 90%, rgba(255, 255, 255, 0) 100%);
+}
+
+#loading {
+  display: block;
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 100;
+  width: 100vw;
+  height: 100vh;
+  background-color: #1D1E1F;
+  -webkit-animation-name: test;
+  -webkit-animation-delay: 1s;
+  -webkit-animation-duration: .3s;
+  -webkit-animation-fill-mode: both;
+}
+
+#loadingLogo {
+  display: block;
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 100;
+  width: 100vw;
+  height: 100vh;
+  background-image: url("/favicon.png");
+  background-position: center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+  -webkit-animation: spin 2s linear infinite;
+  -moz-animation: spin 2s linear infinite;
+  animation: spin 2s linear infinite;
+}
+
+@-webkit-keyframes test {
+  0% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0
+  }
+}
+
+@-moz-keyframes spin {
+  100% {
+    -moz-transform: rotate(360deg);
+  }
+}
+
+@-webkit-keyframes spin {
+  100% {
+    -webkit-transform: rotate(360deg);
+  }
+}
+
+@keyframes spin {
+  100% {
+    -webkit-transform: rotate(360deg);
+    transform: rotate(360deg);
+  }
+}
+
+.apexcharts-legend-text {}
+
+.apexcharts-tooltip {
+  line-height: 1;
+  color: #f1f2f3;
+  background: #2c2c2c !important;
+  border: 0 !important;
+  border-radius: 3px !important;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  white-space: nowrap;
+  z-index: 12;
+  pointer-events: none;
+  position: absolute;
+  box-shadow: 2px 2px 6px -4px #2c2c2c;
+  cursor: default;
+  font-size: 14px;
+}
+
+.apexcharts-tooltip-title {
+  border-bottom: none !important;
+  background: #2c2c2c !important;
+  margin-top: 5px;
+}
+
+#block1,
+#block2,
+#block3,
+#block4 {
+  display: none;
+}
+
+.form-control {
+  padding: .15rem .75rem !important;
+}
+
+.navbar-brand {
+  font-family: "Montserrat";
+  color: #f1f2f3;
+  font-weight: 700;
+}
+
+.navbar-brand::before {
+  font-family: 'XKR';
+  content: "\e900";
+  font-weight: lighter;
+  font-size: 78px;
+  position: relative;
+  /* margin-top: -15px; */
+  color: rgba(0, 0, 0, 0.7);
+  text-align: center;
+  width: 100%;
+  color: #f1f2f3;
+  line-height: 29px;
+  vertical-align: middle;
+  margin-left: 10px;
+  margin-right: 18px;
+  -webkit-animation: rgb_color 10s ease infinite;
+  -moz-animation: rgb_color 10s ease infinite;
+  animation: rgb_color 10s ease infinite;
+  color: #5f86f2;
+
+}
+
+.rgb,
+.gradient {
+
+  background: #5f86f2;
+  -webkit-animation: rgb 60s ease infinite;
+  -moz-animation: rgb 60s ease infinite;
+  animation: rgb 60s ease infinite;
+}
+
+@keyframes rgb_color {
+
+  0%,
+  100% {
+    color: #5f86f2;
+  }
+
+  12.5% {
+    color: #a65ff2;
+  }
+
+  25% {
+    color: #f25fd0;
+  }
+
+  37.5% {
+    color: #f25f61;
+  }
+
+  50% {
+    color: #f2cb5f;
+  }
+
+  62.5% {
+    color: #abf25f;
+  }
+
+  75% {
+    color: #5ff281;
+  }
+
+  87.5% {
+    color: 5ff2f0;
+  }
+}
+
+
+#labels-div {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  font-weight: bolder;
+}
+
+.form-control {
+  background-color: #2f2e30;
+  overflow: hidden;
+  border-radius: 0.50rem;
+  color: white;
+  border: none;
+}
+
+#restoreFromSeedButton,
+#generateWalletButton,
+#restoreFromMnemonicButton,
+#decodeButton,
+#generateRandomPaymentIDButton,
+#encodeAddressButton,
+#sign_check,
+#sign_generate {
+  background-color: #3a353f !important;
+  border: #3a353f !important;
+}
+
+.btn-check:focus+.btn-primary,
+.btn-primary:focus {
+
+  background-color: #0b5ed7;
+  border-color: #0a58ca;
+  box-shadow: 0 0 0 0.25rem rgb(49 132 253 / 0%) !important;
+}
+
+.btn-check:focus+.btn,
+.btn:focus {
+  outline: 0;
+  box-shadow: 0 0 0 0.25rem rgb(13 110 253 / 0%) !important;
+}
+
+.alert {
+  background-color: #2f2e30;
+  display: flex;
+  justify-content: center;
+}
+
+.block span:first-of-type {
+
+  font-family: 'Montserrat';
+}
+
+.lds-grid {
+  display: inline-block;
+  position: relative;
+  transform: scale(0.44);
+  width: 100%;
+  margin-left: 5%;
+  top: -10%;
+}
+
+.lds-grid div {
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  animation: lds-grid 1.2s linear infinite;
+}
+
+.lds-grid div:nth-child(1) {
+  top: 8px;
+  left: 8px;
+  animation-delay: 0s;
+}
+
+.lds-grid div:nth-child(2) {
+  top: 8px;
+  left: 32px;
+  animation-delay: -0.4s;
+}
+
+.lds-grid div:nth-child(3) {
+  top: 8px;
+  left: 56px;
+  animation-delay: -0.8s;
+}
+
+.lds-grid div:nth-child(4) {
+  top: 32px;
+  left: 8px;
+  animation-delay: -0.4s;
+}
+
+.lds-grid div:nth-child(5) {
+  top: 32px;
+  left: 32px;
+  animation-delay: -0.8s;
+}
+
+.lds-grid div:nth-child(6) {
+  top: 32px;
+  left: 56px;
+  animation-delay: -1.2s;
+}
+
+.lds-grid div:nth-child(7) {
+  top: 56px;
+  left: 8px;
+  animation-delay: -0.8s;
+}
+
+.lds-grid div:nth-child(8) {
+  top: 56px;
+  left: 32px;
+  animation-delay: -1.2s;
+}
+
+.lds-grid div:nth-child(9) {
+  top: 56px;
+  left: 56px;
+  animation-delay: -1.6s;
+}
+
+@keyframes lds-grid {
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.5;
+  }
+}
+
+
+
+
+/* --------------------------------------------- */
+
+/* Info */
+
+.center-everything{
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.about-project {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  width: 600px;
+  margin-bottom: 3rem;
+}
+
+.developers {
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  margin-bottom: 3rem;
+}
+
+.dev {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  text-align: center;
+  padding: 1rem;
+}
+
+.link-white {
+  text-decoration: underline;
+  font-weight: bold;
+}
+
+#dev-img {
+  width: 80px;
+  border-radius: 50%;
+  margin-bottom: 1rem;
+}
+
+#blocksum-logo {
+  width: 400px;
+  margin-top: 2rem;
+  margin-bottom: 3rem;
+}
+
+/* Mobile-info */
+
+@media screen and (max-width:736px) {
+  .developers {
+    flex-direction: column !important;
+  }
+
+  .about-project {
+    width: auto !important;
+  }
+
+  #blocksum-logo {
+    width: 200px;
+  }
+}
+
+/* --------------------------------------------- */
+@media screen and (-webkit-min-device-pixel-ratio:0) {
+  /* Custom Webkit scroll bar, super fucking dope
+    http://beautifulpixels.com/goodies/create-custom-webkit-scrollbar/ */
+
+  html {
+    overflow-y: auto;
+    background-color: transparent;
+  }
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-button:start:decrement,
+  ::-webkit-scrollbar-button:end:increment  {
+    height: 30px;
+    display: block;
+    background-color: transparent;
+  }
+
+  ::-webkit-scrollbar-track-piece  {
+    background-color: #eee;
+    -webkit-border-radius: 6px;
+  }
+
+  ::-webkit-scrollbar-thumb:vertical {
+    height: 50px;
+    background-color: #999;
+    //border: 1px solid #eee;
+    -webkit-border-radius: 6px;
+  }
+}
+
+/* Mobile Responsive Styles for Wallet Page */
+@media (max-width: 768px) {
+  /* Hide table header on mobile */
+  #transactionsTable thead {
+    display: none;
+  }
+
+  /* Make each row a card */
+  #transactionsTable tbody tr {
+    display: block;
+    margin-bottom: 1rem;
+    background-color: #282729;
+    border-radius: 8px;
+    padding: 1rem;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+  }
+
+  /* Make each cell a block with label */
+  #transactionsTable tbody td {
+    display: block;
+    padding: 0.5rem 0 !important;
+    position: relative;
+    padding-left: 0 !important;
+    font-size: 13px;
+  }
+
+  /* Add labels before each cell content */
+  #transactionsTable tbody td::before {
+    content: attr(data-label);
+    display: block;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 11px;
+    margin-bottom: 0.25rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  /* Make From/To addresses more readable on mobile */
+  #transactionsTable tbody td[data-label="From / To"] {
+    font-size: 10px;
+  }
+
+  #transactionsTable tbody td[data-label="From / To"] small {
+    font-size: 10px !important;
+  }
+
+  #transactionsTable tbody td[data-label="From / To"] small div {
+    word-break: break-all;
+    line-height: 1.4;
+  }
+
+  /* Wallet overview improvements */
+  .card-body .row > div {
+    margin-bottom: 1rem;
+  }
+
+  /* Adjust balance display on mobile */
+  #totalBalance {
+    font-size: 1.5rem !important;
+  }
+
+  /* Improve address display on mobile */
+  #walletAddress {
+    font-size: 10px !important;
+    word-break: break-all;
+  }
+}
+
+/* Dashboard Block Grid Styles */
+.blocks-wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 20px 0;
+}
+
+.block-border-light {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.block-margin-right {
+  margin-right: 8px;
+}
+
+.block-margin-left {
+  margin-left: 8px;
+}
+
+.block {
+  padding: 10px;
+  text-align: center;
+}
+
+.blockOpacity30 {
+  opacity: 0.3;
+}
+
+.blockOpacity50 {
+  opacity: 0.5;
+}
+
+.block-click {
+  cursor: pointer;
+}
+
+.block-click:hover {
+  background: rgba(99, 102, 241, 0.1);
+}
+
+/* Hide scrollbar but keep scroll functionality */
+.blocks-scroll-container {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE/Edge */
+}
+
+.blocks-scroll-container::-webkit-scrollbar {
+  display: none; /* Chrome/Safari */
+}
+
+/* Loading Spinner for Blocks */
+.lds-grid {
+  display: inline-block;
+  position: relative;
+  width: 40px;
+  height: 40px;
+}
+
+.lds-grid div {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.3);
+  animation: lds-grid 1s linear infinite;
+}
+
+.lds-grid div:nth-child(1) {
+  top: 8px;
+  left: 8px;
+  animation-delay: 0s;
+}
+
+.lds-grid div:nth-child(2) {
+  top: 8px;
+  left: 20px;
+  animation-delay: -0.2s;
+}
+
+.lds-grid div:nth-child(3) {
+  top: 8px;
+  left: 32px;
+  animation-delay: -0.4s;
+}
+
+.lds-grid div:nth-child(4) {
+  top: 20px;
+  left: 8px;
+  animation-delay: -0.2s;
+}
+
+.lds-grid div:nth-child(5) {
+  top: 20px;
+  left: 20px;
+  animation-delay: -0.4s;
+}
+
+.lds-grid div:nth-child(6) {
+  top: 20px;
+  left: 32px;
+  animation-delay: -0.6s;
+}
+
+.lds-grid div:nth-child(7) {
+  top: 32px;
+  left: 8px;
+  animation-delay: -0.4s;
+}
+
+.lds-grid div:nth-child(8) {
+  top: 32px;
+  left: 20px;
+  animation-delay: -0.6s;
+}
+
+.lds-grid div:nth-child(9) {
+  top: 32px;
+  left: 32px;
+  animation-delay: -0.8s;
+}
+
+@keyframes lds-grid {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.3;
+  }
+}

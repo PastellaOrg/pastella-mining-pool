@@ -1,0 +1,11 @@
+/node_modules
+node_modules/
+frontend/dist
+logs/
+/logs
+cert.pem
+chain.pem
+fullchain.pem
+privkey.pem
+package-lock.json
+config.json

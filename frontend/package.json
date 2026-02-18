@@ -1,0 +1,49 @@
+{
+  "name": "pastella-mining-pool-frontend",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "tsc -b && vite build",
+    "lint": "eslint .",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@fortawesome/fontawesome-svg-core": "^7.1.0",
+    "@fortawesome/free-solid-svg-icons": "^7.1.0",
+    "@fortawesome/react-fontawesome": "^3.1.1",
+    "@noble/ed25519": "^3.0.0",
+    "@noble/hashes": "^2.0.1",
+    "apexcharts": "^5.3.6",
+    "bootstrap": "^5.3.8",
+    "bs58": "^6.0.0",
+    "crc-32": "^1.2.2",
+    "js-sha3": "^0.9.3",
+    "moment": "^2.30.1",
+    "react": "^19.2.4",
+    "react-apexcharts": "^1.9.0",
+    "react-dom": "^19.2.4",
+    "react-router-dom": "^6.30.3",
+    "recharts": "^3.7.0",
+    "tweetnacl": "^1.0.3"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.1",
+    "@types/moment": "^2.13.0",
+    "@types/node": "^24.10.9",
+    "@types/react": "^19.2.4",
+    "@types/react-dom": "^19.2.3",
+    "@types/react-router-dom": "^5.3.3",
+    "@vitejs/plugin-react": "^5.1.2",
+    "eslint": "^9.39.1",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "eslint-plugin-react-refresh": "^0.4.24",
+    "globals": "^16.5.0",
+    "typescript": "~5.9.3",
+    "typescript-eslint": "^8.46.4",
+    "vite": "^5.4.21",
+    "vite-plugin-checker": "^0.12.0"
+  }
+}

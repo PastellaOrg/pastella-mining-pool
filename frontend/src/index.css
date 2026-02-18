@@ -1,0 +1,410 @@
+:root {
+  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+
+  color-scheme: light dark;
+  color: rgba(255, 255, 255, 0.87);
+  background-color: #242424;
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  display: flex;
+  place-items: center;
+  min-width: 320px;
+  min-height: 100vh;
+}
+
+a {
+  font-weight: 500;
+  color: #646cff;
+  text-decoration: inherit;
+}
+a:hover {
+  color: #535bf2;
+}
+
+h1 {
+  font-size: 3.2em;
+  line-height: 1.1;
+}
+
+button {
+  border-radius: 8px;
+  border: 1px solid transparent;
+  padding: 0.6em 1.2em;
+  font-size: 1em;
+  font-weight: 500;
+  font-family: inherit;
+  background-color: #1a1a1a;
+  cursor: pointer;
+  transition: border-color 0.25s;
+}
+button:hover {
+  border-color: #646cff;
+}
+button:focus,
+button:focus-visible {
+  outline: 4px auto -webkit-focus-ring-color;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    color: #213547;
+    background-color: #ffffff;
+  }
+  a:hover {
+    color: #747bff;
+  }
+  button {
+    background-color: #f9f9f9;
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+/* Responsive navigation */
+@media (max-width: 768px) {
+  .desktop-menu {
+    display: none !important;
+  }
+
+  .desktop-search {
+    display: none !important;
+  }
+
+  .mobile-menu-toggle {
+    display: flex !important;
+  }
+
+  /* Hide on mobile */
+  .hide-mobile {
+    display: none !important;
+  }
+
+  /* Center on mobile */
+  .center-mobile {
+    text-align: center !important;
+  }
+
+  /* Smaller text on mobile */
+  .mobile-sm-text {
+    font-size: 0.65rem !important;
+  }
+
+  .mobile-md-text {
+    font-size: 1rem !important;
+  }
+
+  .mobile-lg-text {
+    font-size: 1.1rem !important;
+  }
+
+  /* Responsive grid for stats */
+  .mobile-stats-grid {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    justify-content: center !important;
+    align-items: center !important;
+    gap: 15px !important;
+    width: 100% !important;
+  }
+
+  /* Center stat cards on mobile */
+  .mobile-stats-grid > div {
+    flex: 0 0 auto !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    text-align: center !important;
+  }
+
+  /* Responsive tables */
+  .table-responsive {
+    display: block !important;
+    width: 100% !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+
+  .table-responsive table {
+    min-width: 600px !important;
+  }
+
+  /* Hide less important columns on mobile */
+  .hide-mobile td:nth-child(5),
+  .hide-mobile th:nth-child(5),
+  .hide-mobile td:nth-child(6),
+  .hide-mobile th:nth-child(6) {
+    display: none !important;
+  }
+
+  /* Smaller filter buttons on mobile */
+  .mobile-filter-btn {
+    padding: 3px 8px !important;
+    font-size: 0.65rem !important;
+  }
+
+  /* Mobile-friendly form inputs */
+  .mobile-input {
+    padding: 12px 14px !important;
+    font-size: 0.9rem !important;
+    min-height: 44px !important;
+  }
+
+  /* Mobile-friendly pagination buttons */
+  .mobile-pagination-btn {
+    padding: 6px 10px !important;
+    font-size: 0.75rem !important;
+    min-width: 36px !important;
+  }
+
+  /* Center pagination on mobile */
+  .mobile-pagination-center {
+    justify-content: center !important;
+    width: 100% !important;
+  }
+
+  /* Mobile miner rows */
+  .mobile-miner-row {
+    flex-wrap: wrap !important;
+    padding: 12px !important;
+  }
+
+  .mobile-miner-row > div:first-child {
+    margin-right: 12px !important;
+  }
+
+  .mobile-miner-row > div:nth-child(2) {
+    flex-basis: auto !important;
+    width: calc(100% - 60px) !important;
+    margin-bottom: 12px !important;
+  }
+
+  .mobile-miner-row > div:last-child {
+    width: 100% !important;
+    margin-left: 0 !important;
+    justify-content: space-between !important;
+    gap: 12px !important;
+  }
+
+  .mobile-miner-row > div:last-child > div:first-child {
+    order: 1 !important;
+    align-items: flex-start !important;
+  }
+
+  .mobile-miner-row > div:last-child > div:last-child {
+    order: 2 !important;
+  }
+}
+
+@media (min-width: 769px) {
+  .mobile-menu-toggle {
+    display: none !important;
+  }
+}
+
+/* Custom Pink Scrollbar - Webkit browsers (Chrome, Safari, Edge) */
+::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+::-webkit-scrollbar-track {
+  background: #282729;
+  border-radius: 6px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgb(255 192 251);
+  border-radius: 6px;
+  border: 2px solid #282729;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 192, 251, 0.8);
+}
+
+/* Custom Pink Scrollbar - Firefox */
+* {
+  scrollbar-width: auto;
+  scrollbar-color: rgb(255 192 251) #282729;
+}
+
+/* Custom Pink Scrollbar - Standard spec */
+::-webkit-scrollbar-corner {
+  background: #282729;
+}
+
+/* Miner Stats Grid - Mobile Layout */
+@media (max-width: 768px) {
+  .miner-stats-grid {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 12px !important;
+  }
+
+  .miner-stats-grid > .stat-card {
+    flex: 0 0 auto !important;
+  }
+
+  /* Pair cards side by side on mobile - 50% width */
+  .stat-card.pair-half {
+    width: calc(50% - 6px) !important;
+    flex: 0 0 calc(50% - 6px) !important;
+  }
+
+  /* Balance cards remain full width */
+  .stat-card.full-width-mobile {
+    width: 100% !important;
+    flex: 0 0 100% !important;
+  }
+
+  /* Smaller text for mobile stat cards */
+  .stat-card .label {
+    font-size: 0.75rem !important;
+  }
+
+  .stat-card .value {
+    font-size: 1rem !important;
+  }
+
+  /* Tables - Mobile horizontal scroll */
+  .table-scroll-container {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+
+  .table-scroll-container table {
+    min-width: 100% !important;
+    width: max-content !important;
+  }
+
+  .table-scroll-container thead th {
+    white-space: nowrap !important;
+    padding: 12px 16px !important;
+    font-size: 0.7rem !important;
+    position: sticky !important;
+    top: 0 !important;
+    background: rgba(0, 0, 0, 0.2) !important;
+    z-index: 10 !important;
+  }
+
+  .table-scroll-container tbody td {
+    padding: 12px 16px !important;
+    font-size: 0.75rem !important;
+    white-space: nowrap !important;
+  }
+
+  /* Mobile-specific table improvements */
+  .table-scroll-container table {
+    border-collapse: separate !important;
+    border-spacing: 0 !important;
+  }
+
+  /* Custom scrollbar for tables on mobile */
+  .table-scroll-container::-webkit-scrollbar {
+    height: 8px !important;
+    width: 8px !important;
+  }
+
+  .table-scroll-container::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05) !important;
+    border-radius: 4px !important;
+  }
+
+  .table-scroll-container::-webkit-scrollbar-thumb {
+    background: rgba(255, 192, 251, 0.3) !important;
+    border-radius: 4px !important;
+  }
+
+  .table-scroll-container::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 192, 251, 0.5) !important;
+  }
+
+  /* Hide less important columns on very small screens */
+  @media (max-width: 480px) {
+    /* Workers table - hide 6h and 24h avg columns */
+    .table-scroll-container table th:nth-child(6),
+    .table-scroll-container table th:nth-child(7),
+    .table-scroll-container table td:nth-child(6),
+    .table-scroll-container table td:nth-child(7) {
+      display: none !important;
+    }
+  }
+}
+
+/* Tabs - Mobile */
+@media (max-width: 768px) {
+  .card-header > div {
+    flex-wrap: wrap !important;
+  }
+
+  .card-header button {
+    flex: 1 !important;
+    min-width: 50% !important;
+    padding: 12px 16px !important;
+    font-size: 0.75rem !important;
+  }
+
+  /* Don't apply the above styles to filter buttons */
+  .card-header .mobile-filter-btn {
+    flex: none !important;
+    min-width: auto !important;
+    padding: 3px 8px !important;
+    font-size: 0.65rem !important;
+  }
+
+  /* Miner stats page tabs */
+  .mobile-tab-btn {
+    font-size: 0.75rem !important;
+    padding: 12px 16px !important;
+  }
+
+  /* Block Finder Bonus card */
+  .block-finder-bonus .card-body {
+    padding: 20px 16px !important;
+    text-align: left !important;
+  }
+
+  .block-finder-content {
+    justify-content: flex-start !important;
+    flex-wrap: nowrap !important;
+  }
+
+  /* Getting Started page - better column spacing on mobile */
+  .col-12.col-md-6.mb-3[style*="padding-left"] {
+    padding-left: 10px !important;
+    padding-right: 10px !important;
+  }
+
+  /* Mining Software filter buttons - smaller on mobile */
+  .mobile-filter-btn {
+    font-size: 0.65rem !important;
+    padding: 3px 8px !important;
+    min-width: auto !important;
+  }
+}
