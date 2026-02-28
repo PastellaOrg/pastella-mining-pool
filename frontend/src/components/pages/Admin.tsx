@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import apiService from '../../services/api';
-import type { AdminStats, AdminUsers, AdminMonitoring, AdminPorts } from '../../types';
+import type { AdminStats, AdminUser, AdminUsers, AdminMonitoring, AdminPorts } from '../../types';
 
 const Admin: React.FC = () => {
   const navigate = useNavigate();
