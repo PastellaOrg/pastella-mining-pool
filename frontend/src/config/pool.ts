@@ -7,8 +7,8 @@ export interface MiningSoftware {
 }
 
 export default {
-  // Pool API endpoint
-  api: 'https://pool.pastella.org/api',
+  // Pool API endpoint - use local API in development
+  api: import.meta.env.DEV ? 'http://192.168.1.38:8117' : 'https://pool.pastella.org/api',
   block_url: 'https://explorer.pastella.org/block/',
   tx_url: 'https://explorer.pastella.org/transaction/',
   wallet_url: 'https://explorer.pastella.org/wallet/',

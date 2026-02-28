@@ -80,6 +80,10 @@ class ApiService {
   async getApis(): Promise<Record<string, unknown>> {
     return this.fetchJson('/get_apis');
   }
+
+  getBaseUrl(): string {
+    return this.baseUrl;
+  }
 }
 
 const apiService = new ApiService();

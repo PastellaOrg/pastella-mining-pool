@@ -215,3 +215,59 @@ export interface Miner {
   lastShare?: string;
   isActive?: boolean;
 }
+
+// Admin types
+export interface AdminStats {
+  totalOwed: number;
+  totalPaid: number;
+  totalRevenue: number;
+  totalRevenueSolo: number;
+  totalShares: number;
+  blocksUnlocked: number;
+  blocksOrphaned: number;
+  totalWorkers: number;
+}
+
+export interface AdminUser {
+  pending: string;
+  paid: string;
+  lastShare: string;
+  hashes: string;
+  childWallet: string | null;
+  hashrate: number;
+  roundScore: number;
+  roundHashes: number;
+}
+
+export interface AdminUsers {
+  [address: string]: AdminUser;
+}
+
+export interface MonitoringService {
+  lastCheck: string;
+  lastStatus: string;
+  lastResponse: string;
+}
+
+export interface MonitoringData {
+  daemon: MonitoringService;
+  wallet: MonitoringService;
+}
+
+export interface LogFileInfo {
+  size: number;
+  changed: number;
+}
+
+export interface LogsData {
+  [filename: string]: LogFileInfo;
+}
+
+export interface AdminMonitoring {
+  monitoring: MonitoringData;
+  logs: LogsData;
+}
+
+export interface AdminPorts {
+  ports: { [port: string]: number };
+}
