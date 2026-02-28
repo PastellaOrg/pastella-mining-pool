@@ -17,6 +17,8 @@ const Dashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
   const [apiData, setApiData] = useState<ApiResponse | null>(null);
+  const [calculatorHashRateValue, setCalculatorHashRateValue] = useState<string>('');
+  const [calculatorHashRateUnit, setCalculatorHashRateUnit] = useState<string>('KH/s');
 
   const formatHashRate = (hashRate: number | undefined): string => {
     if (!hashRate || hashRate === 0) return '0 H/s';
@@ -29,10 +31,11 @@ const Dashboard: React.FC = () => {
   };
 
   const formatLargeNumber = (num: number): string => {
-    if (num >= 1000000000000) return `${(num / 1000000000000).toFixed(2)} T`;
-    if (num >= 1000000000) return `${(num / 1000000000).toFixed(2)} G`;
-    if (num >= 1000000) return `${(num / 1000).toFixed(2)} M`;
-    if (num >= 1000) return `${(num / 1000).toFixed(2)} K`;
+    if (num >= 1e15) return `${(num / 1e15).toFixed(2)} P`;
+    if (num >= 1e12) return `${(num / 1e12).toFixed(2)} T`;
+    if (num >= 1e9) return `${(num / 1e9).toFixed(2)} G`;
+    if (num >= 1e6) return `${(num / 1e6).toFixed(2)} M`;
+    if (num >= 1e3) return `${(num / 1e3).toFixed(2)} K`;
     return num.toFixed(2);
   };
 
@@ -54,6 +57,49 @@ const Dashboard: React.FC = () => {
     if (amount === 0) return '0';
     const decimals = poolConfig.decimals ?? poolConfig.coinDecimalPlaces ?? 12;
     return (amount / Math.pow(10, decimals)).toFixed(decimals);
+  };
+
+  // Parse hash rate input with unit
+  const parseHashRateInput = (value: string, unit: string): number => {
+    if (!value) return 0;
+    const numValue = parseFloat(value.replace(/,/g, ''));
+    if (isNaN(numValue)) return 0;
+
+    switch (unit) {
+      case 'PH/s': return numValue * 1e15;
+      case 'TH/s': return numValue * 1e12;
+      case 'GH/s': return numValue * 1e9;
+      case 'MH/s': return numValue * 1e6;
+      case 'KH/s': return numValue * 1e3;
+      default: return numValue;
+    }
+  };
+
+  // Calculate profitability per day and month
+  const calculateProfitability = (hashRate: number) => {
+    if (!poolStats?.network?.hashRate || !apiData?.lastblock?.reward || !poolConfig) {
+      return { daily: 0, monthly: 0 };
+    }
+
+    const networkHashRate = poolStats.network.hashRate;
+    const blockReward = apiData.lastblock.reward / Math.pow(10, poolConfig.decimals ?? poolConfig.coinDecimalPlaces ?? 12);
+    const secondsPerDay = 86400;
+
+    // Estimate blocks per day based on network hashrate
+    const networkBlocksPerDay = secondsPerDay / (poolConfig.blockTime || 120);
+
+    // User's share of network hashrate
+    const userShare = hashRate / networkHashRate;
+
+    // Daily earnings (accounting for pool fee)
+    const poolFee = apiData.config.fee / 100;
+    const dailyEarnings = networkBlocksPerDay * blockReward * userShare * (1 - poolFee);
+    const monthlyEarnings = dailyEarnings * 30;
+
+    return {
+      daily: dailyEarnings,
+      monthly: monthlyEarnings
+    };
   };
 
   // Parse blocks from API data - now handles structured objects from backend
@@ -745,6 +791,142 @@ const Dashboard: React.FC = () => {
                     : '-'}
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Pool Information & Profitability Calculator */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '20px', marginBottom: '30px' }}>
+        {/* Pool Information */}
+        <div className="card card-dark" style={{
+          border: '1px solid rgba(255, 255, 255, 0.05)',
+          borderRadius: '12px',
+          background: '#282729'
+        }}>
+          <div className="card-header p-3" style={{
+            borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
+            background: 'linear-gradient(135deg, #282729 0%, #222123 100%)',
+            borderRadius: '12px 12px 0 0'
+          }}>
+            <h6 className="mb-0 text-white" style={{ fontSize: '0.875rem', fontWeight: 600 }}>
+              Pool Information
+            </h6>
+          </div>
+          <div className="card-body" style={{ padding: '16px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
+              <div style={{ textAlign: 'center', padding: '12px', background: 'rgba(255, 192, 251, 0.08)', borderRadius: '8px', border: '1px solid rgba(255, 192, 251, 0.15)' }}>
+                <div className="mobile-sm-text" style={{ fontSize: '0.65rem', color: 'rgba(255, 255, 255, 0.5)', fontWeight: 600, textTransform: 'uppercase', marginBottom: '4px' }}>Pool Fee</div>
+                <div className="mobile-md-text" style={{ fontSize: '1.25rem', fontWeight: 700, color: 'rgb(255, 192, 251)' }}>
+                  {apiData?.config.fee ? `${apiData.config.fee}%` : '-'}
+                </div>
+              </div>
+              <div style={{ textAlign: 'center', padding: '12px', background: 'rgba(255, 200, 200, 0.08)', borderRadius: '8px', border: '1px solid rgba(255, 200, 200, 0.15)' }}>
+                <div className="mobile-sm-text" style={{ fontSize: '0.65rem', color: 'rgba(255, 255, 255, 0.5)', fontWeight: 600, textTransform: 'uppercase', marginBottom: '4px' }}>Solo Fee</div>
+                <div className="mobile-md-text" style={{ fontSize: '1.25rem', fontWeight: 700, color: 'rgb(255, 200, 200)' }}>
+                  {apiData?.config.soloFee ? `${apiData.config.soloFee}%` : '-'}
+                </div>
+              </div>
+              <div style={{ textAlign: 'center', padding: '12px', background: 'rgba(255, 255, 255, 0.02)', borderRadius: '8px' }}>
+                <div className="mobile-sm-text" style={{ fontSize: '0.65rem', color: 'rgba(255, 255, 255, 0.5)', fontWeight: 600, textTransform: 'uppercase', marginBottom: '4px' }}>Min Payout</div>
+                <div className="mobile-md-text" style={{ fontSize: '1.1rem', fontWeight: 700, color: '#ffffff' }}>
+                  {poolConfig ? `${poolConfig.minPayout} ${poolConfig.ticker || 'PAS'}` : '-'}
+                </div>
+              </div>
+              <div style={{ textAlign: 'center', padding: '12px', background: 'rgba(255, 255, 255, 0.02)', borderRadius: '8px' }}>
+                <div className="mobile-sm-text" style={{ fontSize: '0.65rem', color: 'rgba(255, 255, 255, 0.5)', fontWeight: 600, textTransform: 'uppercase', marginBottom: '4px' }}>Payout Interval</div>
+                <div className="mobile-md-text" style={{ fontSize: '1.1rem', fontWeight: 700, color: '#ffffff' }}>
+                  {poolConfig ? `${poolConfig.payoutInterval / 60} min` : '-'}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Profitability Calculator */}
+        <div className="card card-dark" style={{
+          border: '1px solid rgba(255, 255, 255, 0.05)',
+          borderRadius: '12px',
+          background: '#282729'
+        }}>
+          <div className="card-header p-3" style={{
+            borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
+            background: 'linear-gradient(135deg, #282729 0%, #222123 100%)',
+            borderRadius: '12px 12px 0 0'
+          }}>
+            <h6 className="mb-0 text-white" style={{ fontSize: '0.875rem', fontWeight: 600 }}>
+              Profitability Calculator
+            </h6>
+          </div>
+          <div className="card-body" style={{ padding: '16px' }}>
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ display: 'block', fontSize: '0.75rem', color: 'rgba(255, 255, 255, 0.6)', marginBottom: '8px', fontWeight: 500 }}>
+                Your Hash Rate
+              </label>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <input
+                  type="number"
+                  value={calculatorHashRateValue}
+                  onChange={(e) => setCalculatorHashRateValue(e.target.value)}
+                  placeholder="100"
+                  style={{
+                    flex: 1,
+                    padding: '10px 12px',
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    borderRadius: '8px',
+                    color: '#ffffff',
+                    fontSize: '0.9rem',
+                    outline: 'none',
+                    transition: 'all 0.2s'
+                  }}
+                  onFocus={(e) => { e.currentTarget.style.borderColor = 'rgba(255, 192, 251, 0.5)'; e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'; }}
+                  onBlur={(e) => { e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)'; e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'; }}
+                />
+                <select
+                  value={calculatorHashRateUnit}
+                  onChange={(e) => setCalculatorHashRateUnit(e.target.value)}
+                  style={{
+                    padding: '10px 12px',
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    borderRadius: '8px',
+                    color: '#ffffff',
+                    fontSize: '0.9rem',
+                    outline: 'none',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    minWidth: '80px'
+                  }}
+                  onFocus={(e) => { e.currentTarget.style.borderColor = 'rgba(255, 192, 251, 0.5)'; e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'; }}
+                  onBlur={(e) => { e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)'; e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'; }}
+                >
+                  <option value="H/s" style={{ background: '#282729' }}>H/s</option>
+                  <option value="KH/s" style={{ background: '#282729' }}>KH/s</option>
+                  <option value="MH/s" style={{ background: '#282729' }}>MH/s</option>
+                </select>
+              </div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px', background: 'rgba(255, 255, 255, 0.02)', borderRadius: '8px' }}>
+                <div className="mobile-sm-text" style={{ fontSize: '0.75rem', color: 'rgba(255, 255, 255, 0.5)', fontWeight: 600, textTransform: 'uppercase' }}>Daily</div>
+                <div className="mobile-md-text" style={{ fontSize: '1rem', fontWeight: 700, color: '#ffffff' }}>
+                  {calculatorHashRateValue ? (
+                    calculateProfitability(parseHashRateInput(calculatorHashRateValue, calculatorHashRateUnit)).daily.toFixed(4)
+                  ) : '-'} {poolConfig?.ticker || 'PAS'}
+                </div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px', background: 'rgba(255, 255, 255, 0.02)', borderRadius: '8px' }}>
+                <div className="mobile-sm-text" style={{ fontSize: '0.75rem', color: 'rgba(255, 255, 255, 0.5)', fontWeight: 600, textTransform: 'uppercase' }}>Monthly</div>
+                <div className="mobile-md-text" style={{ fontSize: '1rem', fontWeight: 700, color: '#ffffff' }}>
+                  {calculatorHashRateValue ? (
+                    calculateProfitability(parseHashRateInput(calculatorHashRateValue, calculatorHashRateUnit)).monthly.toFixed(4)
+                  ) : '-'} {poolConfig?.ticker || 'PAS'}
+                </div>
+              </div>
+            </div>
+            <div style={{ fontSize: '0.7rem', color: 'rgba(255, 255, 255, 0.4)', marginTop: '12px', textAlign: 'center' }}>
+              * Estimates based on current network conditions
             </div>
           </div>
         </div>

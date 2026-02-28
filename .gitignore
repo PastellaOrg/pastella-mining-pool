@@ -9,3 +9,4 @@ fullchain.pem
 privkey.pem
 package-lock.json
 config.json
+deploy.sh
