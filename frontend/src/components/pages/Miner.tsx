@@ -22,6 +22,83 @@ const Miner: React.FC = () => {
   const [currentTime, setCurrentTime] = useState<number>(() => Math.floor(Date.now() / 1000));
   const [chartsData, setChartsData] = useState<Record<string, unknown> | null>(null);
 
+  // Hide offline workers toggle - default true (enabled), saved to localStorage
+  const [hideOfflineWorkers, setHideOfflineWorkers] = useState<boolean>(() => {
+    const saved = localStorage.getItem('minerPage_hideOfflineWorkers');
+    return saved !== null ? saved === 'true' : true; // Default to true
+  });
+
+  // Save to localStorage when toggle changes
+  useEffect(() => {
+    localStorage.setItem('minerPage_hideOfflineWorkers', hideOfflineWorkers.toString());
+  }, [hideOfflineWorkers]);
+
+  // Worker sorting state - saved to localStorage
+  type WorkerSortColumn = 'hashrate' | 'hashrate_1h' | 'hashrate_6h' | 'hashrate_24h' | 'hashes' | null;
+  const [sortColumn, setSortColumn] = useState<WorkerSortColumn>(() => {
+    const saved = localStorage.getItem('minerPage_sortColumn');
+    return saved && ['hashrate', 'hashrate_1h', 'hashrate_6h', 'hashrate_24h', 'hashes'].includes(saved) ? saved as WorkerSortColumn : null;
+  });
+  type SortDirection = 'desc' | 'asc' | null;
+  const [sortDirection, setSortDirection] = useState<SortDirection>(() => {
+    const saved = localStorage.getItem('minerPage_sortDirection');
+    return saved === 'desc' || saved === 'asc' ? saved : null;
+  });
+
+  // Save sort settings to localStorage when they change
+  useEffect(() => {
+    localStorage.setItem('minerPage_sortColumn', sortColumn || '');
+    localStorage.setItem('minerPage_sortDirection', sortDirection || '');
+  }, [sortColumn, sortDirection]);
+
+  const handleSort = (column: WorkerSortColumn) => {
+    if (sortColumn === column) {
+      // Cycle: desc -> asc -> null (disable)
+      if (sortDirection === 'desc') {
+        setSortDirection('asc');
+      } else if (sortDirection === 'asc') {
+        setSortColumn(null);
+        setSortDirection(null);
+      }
+    } else {
+      // New column, start with descending (highest first)
+      setSortColumn(column);
+      setSortDirection('desc');
+    }
+  };
+
+  // Filter workers based on hideOfflineWorkers setting
+  const filteredWorkers = workers.filter(worker => {
+    if (!hideOfflineWorkers) return true; // Show all workers when toggle is off
+
+    const workerData = worker as unknown as Record<string, unknown>;
+    const lastShare = workerData.lastShare as number | undefined;
+
+    // If no lastShare data, show the worker
+    if (!lastShare) return true;
+
+    // Hide if offline for more than 1 hour (3600 seconds)
+    const timeSinceLastShare = currentTime - lastShare;
+    return timeSinceLastShare <= 3600;
+  });
+
+  // Sort filtered workers
+  const sortedWorkers = sortColumn
+    ? [...filteredWorkers].sort((a, b) => {
+        const aData = a as unknown as Record<string, unknown>;
+        const bData = b as unknown as Record<string, unknown>;
+
+        const aValue = (aData[sortColumn] as number) || 0;
+        const bValue = (bData[sortColumn] as number) || 0;
+
+        if (sortDirection === 'asc') {
+          return aValue - bValue;
+        } else {
+          return bValue - aValue;
+        }
+      })
+    : filteredWorkers; // No sorting, return original order
+
   const formatHashRate = (hashRate: number | undefined): string => {
     if (!hashRate || hashRate === 0) return '0 H/s';
     if (hashRate >= 1000000000000000) return `${(hashRate / 1000000000000000).toFixed(2)} PH/s`;
@@ -382,36 +459,184 @@ const Miner: React.FC = () => {
             background: 'linear-gradient(135deg, #282729 0%, #222123 100%)',
             borderRadius: '12px 12px 0 0'
           }}>
-            <h6 className="mb-0 text-white" style={{ fontSize: '0.875rem', fontWeight: 600 }}>
-              Workers ({workers.length})
-            </h6>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h6 className="mb-0 text-white" style={{ fontSize: '0.875rem', fontWeight: 600 }}>
+                Workers ({filteredWorkers.length}{hideOfflineWorkers && filteredWorkers.length < workers.length && ` / ${workers.length}`})
+              </h6>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px'
+              }}>
+                <span style={{
+                  color: 'rgba(255, 255, 255, 0.6)',
+                  fontSize: '0.75rem',
+                  fontWeight: 500
+                }}>
+                  Hide offline (&gt;1h)
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setHideOfflineWorkers(!hideOfflineWorkers)}
+                  style={{
+                    position: 'relative',
+                    width: '44px',
+                    height: '24px',
+                    background: hideOfflineWorkers ? 'rgb(255, 192, 251)' : 'rgba(255, 255, 255, 0.1)',
+                    border: 'none',
+                    borderRadius: '12px',
+                    cursor: 'pointer',
+                    transition: 'background 0.2s',
+                    padding: 0
+                  }}
+                >
+                  <span style={{
+                    position: 'absolute',
+                    top: '2px',
+                    left: hideOfflineWorkers ? '22px' : '2px',
+                    width: '20px',
+                    height: '20px',
+                    background: '#fff',
+                    borderRadius: '50%',
+                    transition: 'left 0.2s',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+                  }}></span>
+                </button>
+              </div>
+            </div>
           </div>
           <div className="card-body" style={{ padding: 0 }}>
-            <div className="table-scroll-container">
-            <table className="table mb-0" style={{ color: 'rgba(255, 255, 255, 0.7)' }}>
-              <thead>
-                <tr style={{ background: 'rgba(0, 0, 0, 0.2)', borderBottom: '1px solid rgba(255, 255, 255, 0.05)' }}>
-                  <th style={{ padding: '16px', color: 'rgba(255, 255, 255, 0.5)', fontSize: '0.75rem', fontWeight: 600 }}>Status</th>
-                  <th style={{ padding: '16px', color: 'rgba(255, 255, 255, 0.5)', fontSize: '0.75rem', fontWeight: 600 }}>Worker</th>
-                  <th style={{ padding: '16px', color: 'rgba(255, 255, 255, 0.5)', fontSize: '0.75rem', fontWeight: 600 }}>Type</th>
-                  <th style={{ padding: '16px', color: 'rgba(255, 255, 255, 0.5)', fontSize: '0.75rem', fontWeight: 600 }}>Hashrate</th>
-                  <th style={{ padding: '16px', color: 'rgba(255, 255, 255, 0.5)', fontSize: '0.75rem', fontWeight: 600 }}>1h Avg</th>
-                  <th style={{ padding: '16px', color: 'rgba(255, 255, 255, 0.5)', fontSize: '0.75rem', fontWeight: 600 }}>6h Avg</th>
-                  <th style={{ padding: '16px', color: 'rgba(255, 255, 255, 0.5)', fontSize: '0.75rem', fontWeight: 600 }}>24h Avg</th>
-                  <th style={{ padding: '16px', color: 'rgba(255, 255, 255, 0.5)', fontSize: '0.75rem', fontWeight: 600 }}>Total Hashes</th>
-                  <th style={{ padding: '16px', color: 'rgba(255, 255, 255, 0.5)', fontSize: '0.75rem', fontWeight: 600 }}>Last Share</th>
-                </tr>
-              </thead>
-              <tbody>
-                {workers.map((worker, index) => {
-                  const workerData = worker as unknown as Record<string, unknown>;
-                  const lastShare = workerData.lastShare as number | undefined;
-                  const isMining = lastShare && (currentTime - lastShare) < 300; // 5 minutes
-                  const workerType = workerData.type as 'solo' | 'prop' | undefined;
-                  const isSolo = workerType === 'solo';
+            {filteredWorkers.length === 0 ? (
+              <div style={{
+                padding: '60px 20px',
+                textAlign: 'center',
+                color: 'rgba(255, 255, 255, 0.5)',
+                fontSize: '0.875rem'
+              }}>
+                All workers have been offline for more than 1 hour.<br />
+                <span style={{ fontSize: '0.75rem', opacity: 0.7 }}>Toggle &quot;Hide offline&quot; to see all workers.</span>
+              </div>
+            ) : (
+              <div className="table-scroll-container">
+                <table className="table mb-0" style={{ color: 'rgba(255, 255, 255, 0.7)' }}>
+                  <thead>
+                    <tr style={{ background: 'rgba(0, 0, 0, 0.2)', borderBottom: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                      <th style={{ padding: '16px', color: 'rgba(255, 255, 255, 0.5)', fontSize: '0.75rem', fontWeight: 600 }}>Status</th>
+                      <th style={{ padding: '16px', color: 'rgba(255, 255, 255, 0.5)', fontSize: '0.75rem', fontWeight: 600 }}>Worker</th>
+                      <th style={{ padding: '16px', color: 'rgba(255, 255, 255, 0.5)', fontSize: '0.75rem', fontWeight: 600 }}>Type</th>
+                      <th
+                        onClick={() => handleSort('hashrate')}
+                        style={{
+                          padding: '16px',
+                          color: sortColumn === 'hashrate' ? 'rgb(255, 192, 251)' : 'rgba(255, 255, 255, 0.5)',
+                          fontSize: '0.75rem',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          userSelect: 'none'
+                        }}
+                      >
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                          Hashrate
+                          {sortColumn === 'hashrate' ? (
+                            <span>{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                          ) : (
+                            <span style={{ opacity: 0.3 }}>⇅</span>
+                          )}
+                        </span>
+                      </th>
+                      <th
+                        onClick={() => handleSort('hashrate_1h')}
+                        style={{
+                          padding: '16px',
+                          color: sortColumn === 'hashrate_1h' ? 'rgb(255, 192, 251)' : 'rgba(255, 255, 255, 0.5)',
+                          fontSize: '0.75rem',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          userSelect: 'none'
+                        }}
+                      >
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                          1h Avg
+                          {sortColumn === 'hashrate_1h' ? (
+                            <span>{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                          ) : (
+                            <span style={{ opacity: 0.3 }}>⇅</span>
+                          )}
+                        </span>
+                      </th>
+                      <th
+                        onClick={() => handleSort('hashrate_6h')}
+                        style={{
+                          padding: '16px',
+                          color: sortColumn === 'hashrate_6h' ? 'rgb(255, 192, 251)' : 'rgba(255, 255, 255, 0.5)',
+                          fontSize: '0.75rem',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          userSelect: 'none'
+                        }}
+                      >
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                          6h Avg
+                          {sortColumn === 'hashrate_6h' ? (
+                            <span>{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                          ) : (
+                            <span style={{ opacity: 0.3 }}>⇅</span>
+                          )}
+                        </span>
+                      </th>
+                      <th
+                        onClick={() => handleSort('hashrate_24h')}
+                        style={{
+                          padding: '16px',
+                          color: sortColumn === 'hashrate_24h' ? 'rgb(255, 192, 251)' : 'rgba(255, 255, 255, 0.5)',
+                          fontSize: '0.75rem',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          userSelect: 'none'
+                        }}
+                      >
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                          24h Avg
+                          {sortColumn === 'hashrate_24h' ? (
+                            <span>{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                          ) : (
+                            <span style={{ opacity: 0.3 }}>⇅</span>
+                          )}
+                        </span>
+                      </th>
+                      <th
+                        onClick={() => handleSort('hashes')}
+                        style={{
+                          padding: '16px',
+                          color: sortColumn === 'hashes' ? 'rgb(255, 192, 251)' : 'rgba(255, 255, 255, 0.5)',
+                          fontSize: '0.75rem',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          userSelect: 'none'
+                        }}
+                      >
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                          Total Hashes
+                          {sortColumn === 'hashes' ? (
+                            <span>{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                          ) : (
+                            <span style={{ opacity: 0.3 }}>⇅</span>
+                          )}
+                        </span>
+                      </th>
+                      <th style={{ padding: '16px', color: 'rgba(255, 255, 255, 0.5)', fontSize: '0.75rem', fontWeight: 600 }}>Last Share</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sortedWorkers.map((worker, index) => {
+                      const workerData = worker as unknown as Record<string, unknown>;
+                      const lastShare = workerData.lastShare as number | undefined;
+                      const isMining = lastShare && (currentTime - lastShare) < 300; // 5 minutes
+                      const workerType = workerData.type as 'solo' | 'prop' | undefined;
+                      const isSolo = workerType === 'solo';
 
-                  return (
-                    <tr key={index} style={{ borderBottom: index === workers.length - 1 ? 'none' : '1px solid rgba(255, 255, 255, 0.03)' }}>
+                      return (
+                        <tr key={index} style={{ borderBottom: index === sortedWorkers.length - 1 ? 'none' : '1px solid rgba(255, 255, 255, 0.03)' }}>
                       <td style={{ padding: '16px' }}>
                         {isMining ? (
                           <span style={{
@@ -476,7 +701,8 @@ const Miner: React.FC = () => {
                 })}
               </tbody>
             </table>
-            </div>
+              </div>
+            )}
           </div>
         </div>
       )}
