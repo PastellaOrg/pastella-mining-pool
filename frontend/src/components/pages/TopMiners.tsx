@@ -7,6 +7,11 @@ const TopMiners: React.FC = () => {
   const [miners, setMiners] = useState<Miner[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Filter states
+  const [sortBy, setSortBy] = useState<'hashes' | 'hashrate'>('hashrate');
+  const [limit, setLimit] = useState(10);
+  const [excludeInactive, setExcludeInactive] = useState(false);
+
   const formatHashRate = (hashRate: number | undefined): string => {
     if (!hashRate || hashRate === 0) return '0 H/s';
     if (hashRate >= 1000000000000000) return `${(hashRate / 1000000000000000).toFixed(2)} PH/s`;
@@ -34,13 +39,18 @@ const TopMiners: React.FC = () => {
     const fetchTopMiners = async () => {
       try {
         setLoading(true);
-        const data = await apiService.getTopMiners();
+        const data = await apiService.getTopMiners({
+          sortBy,
+          limit,
+          excludeInactive,
+          inactiveHours: excludeInactive ? 0.083 : 24 // 5 minutes when excluding, 24h default
+        });
         const miners = data.miners || [];
 
         // Calculate current time once during data fetch, not during render
         const now = Math.floor(Date.now() / 1000);
 
-        // Transform API data format (miner/hashrate -> address/hashRate) and include lastShare
+        // Transform API data format
         const transformedMiners = miners.map((m: Miner & { miner?: string; hashrate?: number; hashes?: number | string; lastShare?: string }) => {
           const lastShare = m.lastShare;
           const lastShareTime = lastShare ? (typeof lastShare === 'string' ? parseInt(lastShare) : lastShare) : 0;
@@ -57,15 +67,19 @@ const TopMiners: React.FC = () => {
         });
 
         setMiners(transformedMiners);
-        setLoading(false);
       } catch (error) {
         console.error('Error fetching top miners:', error);
+      } finally {
         setLoading(false);
       }
     };
 
     fetchTopMiners();
-  }, []);
+  }, [sortBy, limit, excludeInactive]);
+
+  const handleLimitChange = (value: string) => {
+    setLimit(parseInt(value) || 10);
+  };
 
   if (loading) {
     return (
@@ -87,6 +101,146 @@ const TopMiners: React.FC = () => {
         Top Miners
       </h1>
 
+      {/* Filters */}
+      <div className="card card-dark mb-4" style={{
+        border: '1px solid rgba(255, 255, 255, 0.05)',
+        borderRadius: '12px',
+        background: '#282729'
+      }}>
+        <div className="card-body" style={{ padding: '20px' }}>
+          <div className="row g-3 align-items-center">
+            {/* Sort By Toggle */}
+            <div className="col-md-auto">
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px'
+              }}>
+                <span style={{
+                  color: 'rgba(255, 255, 255, 0.7)',
+                  fontSize: '0.875rem',
+                  fontWeight: 500
+                }}>
+                  Hashes
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const newSortBy = sortBy === 'hashes' ? 'hashrate' : 'hashes';
+                    setSortBy(newSortBy);
+                    if (newSortBy === 'hashrate') {
+                      setExcludeInactive(false); // Reset when switching to hashrate
+                    }
+                  }}
+                  style={{
+                    position: 'relative',
+                    width: '52px',
+                    height: '28px',
+                    background: sortBy === 'hashrate' ? 'rgb(255, 192, 251)' : 'rgba(255, 255, 255, 0.1)',
+                    border: 'none',
+                    borderRadius: '14px',
+                    cursor: 'pointer',
+                    transition: 'background 0.2s',
+                    padding: 0
+                  }}
+                >
+                  <span style={{
+                    position: 'absolute',
+                    top: '2px',
+                    left: sortBy === 'hashrate' ? '26px' : '2px',
+                    width: '24px',
+                    height: '24px',
+                    background: '#fff',
+                    borderRadius: '50%',
+                    transition: 'left 0.2s',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+                  }}></span>
+                </button>
+                <span style={{
+                  color: sortBy === 'hashrate' ? 'rgb(255, 192, 251)' : 'rgba(255, 255, 255, 0.7)',
+                  fontSize: '0.875rem',
+                  fontWeight: sortBy === 'hashrate' ? 600 : 500,
+                  transition: 'color 0.2s'
+                }}>
+                  Hashrate
+                </span>
+              </div>
+            </div>
+
+            {/* Limit */}
+            <div className="col-md-auto">
+              <select
+                className="form-select form-select-dark"
+                style={{
+                  background: '#1a1a1a',
+                  border: '1px solid rgba(255, 255, 255, 0.2)',
+                  color: '#ffffff',
+                  fontSize: '0.875rem',
+                  borderRadius: '8px',
+                  padding: '6px 12px',
+                  cursor: 'pointer'
+                }}
+                value={limit}
+                onChange={(e) => handleLimitChange(e.target.value)}
+              >
+                <option value="10">Top 10</option>
+                <option value="20">Top 20</option>
+                <option value="50">Top 50</option>
+                <option value="100">Top 100</option>
+                <option value="500">Top 500</option>
+              </select>
+            </div>
+
+            {/* Exclude Inactive Toggle - only show when sorting by hashes */}
+            {sortBy === 'hashes' && (
+              <div className="col-md-auto">
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px'
+                }}>
+                  <span style={{
+                    color: 'rgba(255, 255, 255, 0.7)',
+                    fontSize: '0.875rem',
+                    fontWeight: 500
+                  }}>
+                    Exclude inactive
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setExcludeInactive(!excludeInactive)}
+                    style={{
+                      position: 'relative',
+                      width: '52px',
+                      height: '28px',
+                      background: excludeInactive ? 'rgb(255, 192, 251)' : 'rgba(255, 255, 255, 0.1)',
+                      border: 'none',
+                      borderRadius: '14px',
+                      cursor: 'pointer',
+                      transition: 'background 0.2s',
+                      padding: 0
+                    }}
+                  >
+                    <span style={{
+                      position: 'absolute',
+                      top: '2px',
+                      left: excludeInactive ? '26px' : '2px',
+                      width: '24px',
+                      height: '24px',
+                      background: '#fff',
+                      borderRadius: '50%',
+                      transition: 'left 0.2s',
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+                    }}></span>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Miners List */}
       {miners.length === 0 ? (
         <div className="card card-dark" style={{
           border: '1px solid rgba(255, 255, 255, 0.05)',
@@ -94,7 +248,7 @@ const TopMiners: React.FC = () => {
           background: '#282729'
         }}>
           <div className="card-body" style={{ padding: '60px 20px', textAlign: 'center', color: 'rgba(255, 255, 255, 0.5)' }}>
-            No miners yet
+            No miners found
           </div>
         </div>
       ) : (
@@ -110,17 +264,18 @@ const TopMiners: React.FC = () => {
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <h6 className="mb-0 text-white" style={{ fontSize: '0.875rem', fontWeight: 600 }}>
-                Top 10 Miners by Hashes
+                Top {limit} Miners by {sortBy === 'hashes' ? 'Total Hashes' : 'Hashrate'}
+                {excludeInactive && ' (excluding inactive)'}
               </h6>
               <span style={{
                 background: 'rgba(255, 192, 251, 0.1)',
                 padding: '4px 10px',
                 borderRadius: '6px',
-                color: 'rgb(255 192 251)',
+                color: 'rgb(255, 192, 251)',
                 fontSize: '0.75rem',
                 fontWeight: 600
               }}>
-                {miners.length} Total
+                {miners.length} shown
               </span>
             </div>
           </div>
@@ -152,7 +307,7 @@ const TopMiners: React.FC = () => {
                   background: index < 3
                     ? 'rgba(255, 192, 251, 0.2)'
                     : 'rgba(255, 255, 255, 0.05)',
-                  color: 'rgb(255 192 251)',
+                  color: 'rgb(255, 192 251)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',

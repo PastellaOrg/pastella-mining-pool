@@ -69,8 +69,26 @@ class ApiService {
     return this.fetchJson('/get_market');
   }
 
-  async getTopMiners(): Promise<{ miners: Miner[] }> {
-    return this.fetchJson<{ miners: Miner[] }>('/get_top10miners');
+  async getTopMiners(params?: {
+    sortBy?: 'hashes' | 'hashrate';
+    limit?: number;
+    excludeInactive?: boolean;
+    inactiveHours?: number;
+  }): Promise<{
+    miners: Miner[];
+    sortBy?: string;
+    excludeInactive?: boolean;
+    total: number;
+  }> {
+    const queryParams = new URLSearchParams();
+    if (params) {
+      if (params.sortBy) queryParams.append('sortBy', params.sortBy);
+      if (params.limit) queryParams.append('limit', params.limit.toString());
+      if (params.excludeInactive) queryParams.append('excludeInactive', params.excludeInactive.toString());
+      if (params.inactiveHours) queryParams.append('inactiveHours', params.inactiveHours.toString());
+    }
+    const queryString = queryParams.toString();
+    return this.fetchJson(`/get_top10miners${queryString ? '?' + queryString : ''}`);
   }
 
   async getBlockExplorers(): Promise<{ explorers: Array<{ url: string, name: string }> }> {

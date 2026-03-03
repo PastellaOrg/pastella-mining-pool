@@ -328,7 +328,7 @@ const Dashboard: React.FC = () => {
 
         // Fetch top miners
         try {
-          const topMinersData = await apiService.getTopMiners();
+          const topMinersData = await apiService.getTopMiners({ sortBy: 'hashrate' });
           const miners = topMinersData.miners || [];
 
           // Calculate current time once during data fetch, not during render
